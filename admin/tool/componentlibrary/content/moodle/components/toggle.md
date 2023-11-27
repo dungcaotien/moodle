@@ -19,7 +19,6 @@ The parameters for the template context are:
 * checked: If the initial status is checked.
 * disabled: If toggle input is disabled.
 * dataattributes: Array of name/value elements added as data-attributes.
-* title: Title text.
 * label: Label text.
 * labelclasses: Any extra classes added to the label container.
 
@@ -36,7 +35,6 @@ Checked toggle and with "sr-only" label.
             "name": "action",
             "value": "toggle-status"
         }],
-        "title": "Toggle Enabled",
         "label": "Enable/disable status",
         "labelclasses": "sr-only"
     }
@@ -54,14 +52,13 @@ Disabled toggle with extra classes.
             "name": "action",
             "value": "toggle-status"
         }],
-        "title": "Toggle Disabled",
         "label": "Enable/disable status"
     }
 {{< /mustache >}}
 
 ## Use toggle as a template block
 
-It is also possible to include *core/toggle* in any other template using [blocks](https://moodledev.io/docs/guides/templates#blocks), instead of rendering it with a context.
+It is also possible to include *core/toggle* in any other template using [blocks](https://docs.moodle.org/dev/Templates#Blocks), instead of rendering it with a context.
 The parameters that you can define are:
 * id: Unique id for the toggle input.
 * extraclasses: Any extra classes added to the toggle input outer container.
@@ -71,7 +68,6 @@ The parameters that you can define are:
     * disabled
 * labelmarkup: Label element code block.
   * Should include *class="custom-control-label"*.
-* title: Title text.
 * label: Label text.
 * labelclasses: Any extra classes added to the label container.
 

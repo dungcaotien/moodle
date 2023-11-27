@@ -151,8 +151,6 @@ class ADODB_mssqlnative extends ADOConnection {
 
 		$arrServerInfo = sqlsrv_server_info($this->_connectionID);
 		$ADODB_FETCH_MODE = $savem;
-
-		$arr = array();
 		$arr['description'] = $arrServerInfo['SQLServerName'].' connected to '.$arrServerInfo['CurrentDatabase'];
 		$arr['version'] = $arrServerInfo['SQLServerVersion'];//ADOConnection::_findvers($arr['description']);
 		return $arr;
@@ -184,10 +182,8 @@ class ADODB_mssqlnative extends ADOConnection {
 
 	function _affectedrows()
 	{
-		if ($this->_queryID && is_resource($this->_queryID)) {
-			return sqlsrv_rows_affected($this->_queryID);
-		}
-		return false;
+		if ($this->_queryID)
+		return sqlsrv_rows_affected($this->_queryID);
 	}
 
 	function GenID($seq='adodbseq',$start=1) {
@@ -440,6 +436,7 @@ class ADODB_mssqlnative extends ADOConnection {
 	function SelectDB($dbName)
 	{
 		$this->database = $dbName;
+		$this->databaseName = $dbName; # obsolete, retained for compat with older adodb versions
 		if ($this->_connectionID) {
 			$rs = $this->Execute('USE '.$dbName);
 			if($rs) {
@@ -646,6 +643,13 @@ class ADODB_mssqlnative extends ADOConnection {
 			$rez = sqlsrv_query($this->_connectionID, $sql);
 		}
 
+		if ($this->debug) {
+			ADOConnection::outp("<hr>running query: " . var_export($sql, true)
+				. "<hr>input array: " . var_export($inputarr, true)
+				. "<hr>result: " . var_export($rez, true)
+			);
+		}
+
 		$this->lastInsID = false;
 		if (!$rez) {
 			$rez = false;
@@ -655,27 +659,23 @@ class ADODB_mssqlnative extends ADOConnection {
 			// e.g. if triggers are involved (see #41)
 			while (sqlsrv_next_result($rez)) {
 				sqlsrv_fetch($rez);
-				$this->lastInsID = sqlsrv_get_field($rez, 0);
+				$this->lastInsID = sqlsrv_get_field($rez, 0, SQLSRV_PHPTYPE_INT);
 			}
 		}
 		return $rez;
 	}
 
-	/**
-	 * Rolls back pending transactions and closes the connection.
-	 *
-	 * @return bool True, unless the connection id is invalid
-	 */
+	// returns true or false
 	function _close()
 	{
 		if ($this->transCnt) {
 			$this->RollbackTrans();
 		}
-		if ($this->_connectionID) {
-			return sqlsrv_close($this->_connectionID);
+		if($this->_connectionID) {
+			$rez = sqlsrv_close($this->_connectionID);
 		}
 		$this->_connectionID = false;
-		return true;
+		return $rez;
 	}
 
 
@@ -719,7 +719,7 @@ class ADODB_mssqlnative extends ADOConnection {
 		return $indexes;
 	}
 
-	public function metaForeignKeys($table, $owner = '', $upper = false, $associative = false)
+	function MetaForeignKeys($table, $owner=false, $upper=false)
 	{
 		global $ADODB_FETCH_MODE;
 
@@ -1007,37 +1007,6 @@ class ADODB_mssqlnative extends ADOConnection {
 		}
 
 		return $metaProcedures;
-	}
-
-	/**
-	* An SQL Statement that adds a specific number of
-	* days or part to local datetime
-	*
-	* @param float $dayFraction
-	* @param string $date
-	*
-	* @return string
-	*/
-	public function offsetDate($dayFraction, $date = false)
-	{
-		if (!$date)
-			/*
-			* Use GETDATE() via systTimestamp;
-			*/
-			$date = $this->sysTimeStamp;
-
-		/*
-		* seconds, number of seconds, date base
-		*/
-		$dateFormat = "DATEADD(s, %s, %s)";
-
-		/*
-		* Adjust the offset back to seconds
-		*/
-		$fraction = $dayFraction * 24 * 3600;
-
-		return sprintf($dateFormat,$fraction,$date);
-
 	}
 
 }

@@ -68,19 +68,6 @@
             }
         }
     }
-    body.mediumwidth {
-        #page.drawers {
-            .main-inner {
-                max-width: $medium-content-maxwidth;
-            }
-            .footer-popover {
-                max-width: $medium-content-maxwidth;
-                width: 100%;
-                margin: 0 auto;
-                @include border-radius();
-            }
-        }
-    }
     .header-maxwidth {
         max-width: $course-content-maxwidth;
         margin: 0 auto;
@@ -181,6 +168,9 @@
     #page.drawers .main-inner {
         margin-top: 1.5rem;
     }
+    #page.drawers .drawer-right-toggle {
+        margin-right: 0.7rem;
+    }
 }
 
 @include media-breakpoint-up(md) {
@@ -205,18 +195,12 @@
         top: $navbar-height;
         height: calc(100vh - #{$navbar-height});
     }
-    .hasstickyfooter {
-        .drawer-left,
-        .drawer-right {
-            top: $navbar-height;
-            height: calc(100vh - #{$navbar-height} - #{$stickyfooter-height});
-        }
-    }
 
     #page.drawers {
         position: relative;
-        overflow-y: visible;
+        overflow-y: auto;
         @include transition(0.2s);
+        height: calc(100vh - #{$navbar-height});
         left: 0;
         right: 0;
         &.show-drawer-left {
@@ -228,17 +212,13 @@
             margin-left: 0;
             margin-right: $drawer-right-width;
             padding-right: 1rem;
-            .jsenabled & .btn-footer-popover,
-            .jsenabled & .btn-footer-communication {
+            .jsenabled & .btn-footer-popover {
                 right: calc(#{$drawer-right-width} + 2rem);
             }
         }
         &.show-drawer-left.show-drawer-right {
             margin-left: $drawer-left-width;
             margin-right: $drawer-right-width;
-        }
-        &.hasstickyfooter {
-            margin-bottom: $stickyfooter-height;
         }
     }
 }

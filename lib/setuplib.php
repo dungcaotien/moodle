@@ -344,67 +344,6 @@ class file_serving_exception extends moodle_exception {
 }
 
 /**
- * Get the Whoops! handler.
- *
- * @return \Whoops\Run|null
- */
-function get_whoops(): ?\Whoops\Run {
-    global $CFG;
-
-    if (CLI_SCRIPT || AJAX_SCRIPT) {
-        return null;
-    }
-
-    if (defined('PHPUNIT_TEST') && PHPUNIT_TEST) {
-        return null;
-    }
-
-    if (defined('BEHAT_TEST') && BEHAT_TEST) {
-        return null;
-    }
-
-    if (!$CFG->debugdisplay) {
-        return null;
-    }
-
-    if (!$CFG->debug_developer_use_pretty_exceptions) {
-        return null;
-    }
-
-    $composerautoload = "{$CFG->dirroot}/vendor/autoload.php";
-    if (file_exists($composerautoload)) {
-        require_once($composerautoload);
-    }
-
-    if (!class_exists(\Whoops\Run::class)) {
-        return null;
-    }
-
-    // We have Whoops available, use it.
-    $whoops = new \Whoops\Run();
-
-    // Append a custom handler to add some more information to the frames.
-    $whoops->appendHandler(function ($exception, $inspector, $run) {
-        // Moodle exceptions often have a link to the Moodle docs pages for them.
-        // Add that to the first frame in the stack.
-        $info = get_exception_info($exception);
-        if ($info->moreinfourl) {
-            $collection = $inspector->getFrames();
-            $collection[0]->addComment("{$info->moreinfourl}", 'More info');
-        }
-    });
-
-    // Add the Pretty page handler. It's the bee's knees.
-    $handler = new \Whoops\Handler\PrettyPageHandler();
-    if (isset($CFG->debug_developer_editor)) {
-        $handler->setEditor($CFG->debug_developer_editor ?: null);
-    }
-    $whoops->appendHandler($handler);
-
-    return $whoops;
-}
-
-/**
  * Default exception handler.
  *
  * @param Exception $ex
@@ -426,11 +365,6 @@ function default_exception_handler($ex) {
     // If we already tried to send the header remove it, the content length
     // should be either empty or the length of the error page.
     @header_remove('Content-Length');
-
-    if ($whoops = get_whoops()) {
-        // If whoops is available we will use it. The get_whoops() function checks whether all conditions are met.
-        $whoops->handleException($ex);
-    }
 
     if (is_early_init($info->backtrace)) {
         echo bootstrap_renderer::early_error($info->message, $info->moreinfourl, $info->link, $info->backtrace, $info->debuginfo, $info->errorcode);
@@ -488,10 +422,6 @@ function default_exception_handler($ex) {
  * @return bool false means use default error handler
  */
 function default_error_handler($errno, $errstr, $errfile, $errline) {
-    if ($whoops = get_whoops()) {
-        // If whoops is available we will use it. The get_whoops() function checks whether all conditions are met.
-        $whoops->handleError($errno, $errstr, $errfile, $errline);
-    }
     if ($errno == 4096) {
         //fatal catchable error
         throw new coding_exception('PHP catchable fatal error', $errstr);
@@ -548,6 +478,23 @@ function is_early_init($backtrace) {
         }
     }
     return false;
+}
+
+/**
+ * Abort execution by throwing of a general exception,
+ * default exception handler displays the error message in most cases.
+ *
+ * @param string $errorcode The name of the language string containing the error message.
+ *      Normally this should be in the error.php lang file.
+ * @param string $module The language file to get the error message from.
+ * @param string $link The url where the user will be prompted to continue.
+ *      If no url is provided the user will be directed to the site index page.
+ * @param object $a Extra words and phrases that might be required in the error string
+ * @param string $debuginfo optional debugging information
+ * @return void, always throws exception!
+ */
+function print_error($errorcode, $module = 'error', $link = '', $a = null, $debuginfo = null) {
+    throw new moodle_exception($errorcode, $module, $link, $a, $debuginfo);
 }
 
 /**
@@ -620,7 +567,7 @@ function get_exception_info($ex): stdClass {
     if (function_exists('clean_text')) {
         $message = clean_text($message);
     } else {
-        $message = htmlspecialchars($message, ENT_COMPAT);
+        $message = htmlspecialchars($message);
     }
 
     if (!empty($CFG->errordocroot)) {
@@ -704,7 +651,6 @@ function get_docs_url($path = null) {
         $path = '';
     }
 
-    $path = $path ?? '';
     // Absolute URLs are used unmodified.
     if (substr($path, 0, 7) === 'http://' || substr($path, 0, 8) === 'https://') {
         return $path;
@@ -823,7 +769,7 @@ function setup_validate_php_configuration() {
    // this must be very fast - no slow checks here!!!
 
    if (ini_get_bool('session.auto_start')) {
-        throw new \moodle_exception('sessionautostartwarning', 'admin');
+       print_error('sessionautostartwarning', 'admin');
    }
 }
 
@@ -909,7 +855,7 @@ function initialise_fullme() {
 
     // Detect common config error.
     if (substr($CFG->wwwroot, -1) == '/') {
-        throw new \moodle_exception('wwwrootslash', 'error');
+        print_error('wwwrootslash', 'error');
     }
 
     if (CLI_SCRIPT) {
@@ -976,7 +922,7 @@ function initialise_fullme() {
     if (empty($CFG->sslproxy)) {
         if ($rurl['scheme'] === 'http' and $wwwroot['scheme'] === 'https') {
             if (defined('REQUIRE_CORRECT_ACCESS') && REQUIRE_CORRECT_ACCESS) {
-                throw new \moodle_exception('sslonlyaccess', 'error');
+                print_error('sslonlyaccess', 'error');
             } else {
                 redirect($CFG->wwwroot, get_string('wwwrootmismatch', 'error', $CFG->wwwroot), 3);
             }
@@ -990,18 +936,11 @@ function initialise_fullme() {
         $_SERVER['SERVER_PORT'] = 443; // Assume default ssl port for the proxy.
     }
 
-    // Using Moodle in "reverse proxy" mode, it's expected that the HTTP Host Moodle receives is different
-    // from the wwwroot configured host. Those URLs being identical could be the consequence of various
-    // issues, including:
-    // - Intentionally trying to set up moodle with 2 distinct addresses for intranet and Internet: this
-    //   configuration is unsupported and will lead to bigger problems down the road (the proper solution
-    //   for this is adjusting the network routes, and avoid relying on the application for network concerns).
-    // - Misconfiguration of the reverse proxy that would be forwarding the Host header: while it is
-    //   standard in many cases that the reverse proxy would do that, in our case, the reverse proxy
-    //   must leave the Host header pointing to the internal name of the server.
-    // Port forwarding is allowed, though.
+    // Hopefully this will stop all those "clever" admins trying to set up moodle
+    // with two different addresses in intranet and Internet.
+    // Port forwarding is still allowed!
     if (!empty($CFG->reverseproxy) && $rurl['host'] === $wwwroot['host'] && (empty($wwwroot['port']) || $rurl['port'] === $wwwroot['port'])) {
-        throw new \moodle_exception('reverseproxyabused', 'error');
+        print_error('reverseproxyabused', 'error');
     }
 
     $hostandport = $rurl['scheme'] . '://' . $wwwroot['host'];
@@ -1272,6 +1211,7 @@ function init_performance_info() {
     global $PERF, $CFG, $USER;
 
     $PERF = new stdClass();
+    $PERF->logwrites = 0;
     if (function_exists('microtime')) {
         $PERF->starttime = microtime();
     }
@@ -1492,7 +1432,7 @@ function disable_output_buffering() {
  */
 function is_major_upgrade_required() {
     global $CFG;
-    $lastmajordbchanges = 2022101400.03; // This should be the version where the breaking changes happen.
+    $lastmajordbchanges = 2022022200.00;
 
     $required = empty($CFG->version);
     $required = $required || (float)$CFG->version < $lastmajordbchanges;
@@ -1517,7 +1457,7 @@ function redirect_if_major_upgrade_required() {
         $url = $CFG->wwwroot . '/' . $CFG->admin . '/index.php';
         @header($_SERVER['SERVER_PROTOCOL'] . ' 303 See Other');
         @header('Location: ' . $url);
-        echo bootstrap_renderer::plain_redirect_message(htmlspecialchars($url, ENT_COMPAT));
+        echo bootstrap_renderer::plain_redirect_message(htmlspecialchars($url));
         exit;
     }
 }
@@ -1527,7 +1467,7 @@ function redirect_if_major_upgrade_required() {
  *
  * To be inserted in the core functions that can not be called by pluigns during upgrade.
  * Core upgrade should not use any API functions at all.
- * See {@link https://moodledev.io/docs/guides/upgrade#upgrade-code-restrictions}
+ * See {@link http://docs.moodle.org/dev/Upgrade_API#Upgrade_code_restrictions}
  *
  * @throws moodle_exception if executed from inside of upgrade script and $warningonly is false
  * @param bool $warningonly if true displays a warning instead of throwing an exception
@@ -2240,45 +2180,4 @@ class bootstrap_renderer {
 
         return $html;
     }
-}
-
-/**
- * Add http stream instrumentation
- *
- * This detects which any reads or writes to a php stream which uses
- * the 'http' handler. Ideally 100% of traffic uses the Moodle curl
- * libraries which do not use php streams.
- *
- * @param array $code stream callback code
- */
-function proxy_log_callback($code) {
-    if ($code == STREAM_NOTIFY_CONNECT) {
-        $trace = debug_backtrace();
-        $function = $trace[count($trace) - 1];
-        $error = "Unsafe internet IO detected: {$function['function']} with arguments " . join(', ', $function['args']) . "\n";
-        error_log($error . format_backtrace($trace, true)); // phpcs:ignore
-    }
-}
-
-/**
- * A helper function for deprecated files to use to ensure that, when they are included for unit tests,
- * they are run in an isolated process.
- *
- * @throws \coding_exception The exception thrown when the process is not isolated.
- */
-function require_phpunit_isolation(): void {
-    if (!defined('PHPUNIT_TEST') || !PHPUNIT_TEST) {
-        // Not a test.
-        return;
-    }
-
-    if (defined('PHPUNIT_ISOLATED_TEST') && PHPUNIT_ISOLATED_TEST) {
-        // Already isolated.
-        return;
-    }
-
-    throw new \coding_exception(
-        'When including this file for a unit test, the test must be run in an isolated process. ' .
-            'See the PHPUnit @runInSeparateProcess and @runTestsInSeparateProcesses annotations.'
-    );
 }

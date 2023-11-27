@@ -538,7 +538,7 @@ class question_type {
         $result = $this->save_question_options($form);
 
         if (!empty($result->error)) {
-            throw new \moodle_exception($result->error);
+            print_error($result->error);
         }
 
         if (!empty($result->notice)) {
@@ -1405,7 +1405,7 @@ class question_type {
 
         $question = new stdClass();
         $question->courseid = $courseid;
-        $question->qtype = $this->name();
+        $question->qtype = $this->qtype;
         return array($form, $question);
     }
 

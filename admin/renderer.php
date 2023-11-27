@@ -44,7 +44,7 @@ class core_admin_renderer extends plugin_renderer_base {
         $output .= $this->heading(get_string('copyrightnotice'));
         $output .= $this->box($copyrightnotice, 'copyrightnotice');
         $output .= html_writer::empty_tag('br');
-        $output .= $this->confirm(get_string('doyouagree'), $continue, "https://moodledev.io/general/license");
+        $output .= $this->confirm(get_string('doyouagree'), $continue, "http://docs.moodle.org/dev/License");
         $output .= $this->footer();
 
         return $output;
@@ -213,7 +213,7 @@ class core_admin_renderer extends plugin_renderer_base {
             $output .= $this->container_end();
         }
 
-        $button = new single_button($continueurl, get_string('upgradestart', 'admin'), 'get', single_button::BUTTON_PRIMARY);
+        $button = new single_button($continueurl, get_string('upgradestart', 'admin'), 'get', true);
         $button->class = 'continuebutton';
         $output .= $this->render($button);
         $output .= $this->footer();
@@ -296,6 +296,7 @@ class core_admin_renderer extends plugin_renderer_base {
         $output .= $this->header();
         $output .= $this->output->heading(get_string('notifications', 'admin'));
         $output .= $this->maturity_info($maturity);
+        $output .= $this->legacy_log_store_writing_error();
         $output .= empty($CFG->disableupdatenotifications) ? $this->available_updates($availableupdates, $availableupdatesfetch) : '';
         $output .= $this->insecure_dataroot_warning($insecuredataroot);
         $output .= $this->development_libs_directories_warning($devlibdir);
@@ -745,10 +746,10 @@ class core_admin_renderer extends plugin_renderer_base {
         //////////////////////////////////////////////////////////////////////////////////////////////////
         ////  IT IS ILLEGAL AND A VIOLATION OF THE GPL TO HIDE, REMOVE OR MODIFY THIS COPYRIGHT NOTICE ///
         $copyrighttext = '<a href="http://moodle.org/">Moodle</a> '.
-                         '<a href="https://moodledev.io/general/releases" title="'.$CFG->version.'">'.$CFG->release.'</a><br />'.
+                         '<a href="http://docs.moodle.org/dev/Releases" title="'.$CFG->version.'">'.$CFG->release.'</a><br />'.
                          'Copyright &copy; 1999 onwards, Martin Dougiamas<br />'.
                          'and <a href="http://moodle.org/dev">many other contributors</a>.<br />'.
-                         '<a href="https://moodledev.io/general/license">GNU Public License</a>';
+                         '<a href="http://docs.moodle.org/dev/License">GNU Public License</a>';
         //////////////////////////////////////////////////////////////////////////////////////////////////
 
         return $this->box($copyrighttext, 'copyright');
@@ -897,8 +898,7 @@ class core_admin_renderer extends plugin_renderer_base {
         $url = "https://campaign.moodle.org/current/lms/{$lang}/install/";
         $params = [
             'url' => $url,
-            'iframeid' => 'campaign-content',
-            'title' => get_string('campaign', 'admin'),
+            'iframeid' => 'campaign-content'
         ];
 
         return $this->render_from_template('core/external_content_banner', $params);
@@ -919,8 +919,7 @@ class core_admin_renderer extends plugin_renderer_base {
         $url = "https://campaign.moodle.org/current/lms/{$lang}/servicesandsupport/";
         $params = [
             'url' => $url,
-            'iframeid' => 'services-support-content',
-            'title' => get_string('supportandservices', 'admin'),
+            'iframeid' => 'services-support-content'
         ];
 
         return $this->render_from_template('core/external_content_banner', $params);
@@ -992,7 +991,7 @@ class core_admin_renderer extends plugin_renderer_base {
      * @return string HTML to output.
      */
     protected function release_notes_link() {
-        $releasenoteslink = get_string('releasenoteslink', 'admin', 'https://moodledev.io/general/releases');
+        $releasenoteslink = get_string('releasenoteslink', 'admin', 'http://docs.moodle.org/dev/Releases');
         $releasenoteslink = str_replace('target="_blank"', 'onclick="this.target=\'_blank\'"', $releasenoteslink); // extremely ugly validation hack
         return $this->box($releasenoteslink, 'generalbox alert alert-info');
     }
@@ -2081,7 +2080,7 @@ class core_admin_renderer extends plugin_renderer_base {
                         $errorline = true;
                     } else {
                         if ($status) {                                          //Handle ok result (ok)
-                            $status = get_string('statusok');
+                            $status = get_string('ok');
                         } else {
                             if ($environment_result->getLevel() == 'optional') {//Handle check result (warning)
                                 $status = get_string('check');
@@ -2194,6 +2193,21 @@ class core_admin_renderer extends plugin_renderer_base {
     }
 
     /**
+     * Check to see if writing to the deprecated legacy log store is enabled.
+     *
+     * @return string An error message if writing to the legacy log store is enabled.
+     */
+    protected function legacy_log_store_writing_error() {
+        $enabled = get_config('logstore_legacy', 'loglegacy');
+        $plugins = explode(',', get_config('tool_log', 'enabled_stores'));
+        $enabled = $enabled && in_array('logstore_legacy', $plugins);
+
+        if ($enabled) {
+            return $this->warning(get_string('legacylogginginuse'));
+        }
+    }
+
+    /**
      * Display message about the benefits of registering on Moodle.org
      *
      * @return string
@@ -2252,16 +2266,5 @@ class core_admin_renderer extends plugin_renderer_base {
         }
 
         return $this->warning($xmlrpcwarning);
-    }
-
-    /**
-     * Renders the theme selector list.
-     *
-     * @param core_admin\output\theme_selector $themeselector
-     * @return string HTML
-     */
-    public function theme_selector_list(core_admin\output\theme_selector $themeselector): string {
-        $renderable = $themeselector->export_for_template($this);
-        return $this->render_from_template('core_admin/themeselector/theme_selector', $renderable);
     }
 }

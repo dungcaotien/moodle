@@ -20,13 +20,6 @@ interface H5PFileStorage {
   public function saveLibrary($library);
 
   /**
-   * Delete library folder
-   *
-   * @param array $library
-   */
-  public function deleteLibrary($library);
-
-  /**
    * Store the content folder.
    *
    * @param string $source
@@ -147,7 +140,7 @@ interface H5PFileStorage {
    * Save files uploaded through the editor.
    * The files must be marked as temporary until the content form is saved.
    *
-   * @param H5peditorFile $file
+   * @param \H5peditorFile $file
    * @param int $contentId
    */
   public function saveFile($file, $contentId);

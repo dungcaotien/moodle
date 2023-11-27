@@ -23,11 +23,21 @@
  */
 
 import Fragment from 'core/fragment';
-import ModalCancel from 'core/modal_cancel';
-import Notification from 'core/notification';
 import * as Str from 'core/str';
+import ModalFactory from 'core/modal_factory';
+import Notification from 'core/notification';
 
-let modal = null;
+/**
+ * Get the fragment.
+ *
+ * @method getFragment
+ * @param {{questioned: int}} args
+ * @param {int} contextId
+ * @return {string}
+ */
+const getFragment = (args, contextId) => {
+    return Fragment.loadFragment('qbank_usage', 'question_usage', contextId, args);
+};
 
 /**
  * Event listeners for the module.
@@ -35,60 +45,42 @@ let modal = null;
  * @method clickEvent
  * @param {int} questionId
  * @param {int} contextId
- * @param {boolean} specificVersion Is the view listing specific question versions?
  */
-const usageEvent = async(questionId, contextId, specificVersion) => {
-    const args = {
-        questionid: questionId,
-        specificversion: specificVersion,
+const usageEvent = (questionId, contextId) => {
+    let args = {
+        questionid: questionId
     };
-    if (modal === null) {
-        try {
-            modal = await ModalCancel.create({
-                title: Str.get_string('usageheader', 'qbank_usage'),
-                body: Fragment.loadFragment('qbank_usage', 'question_usage', contextId, args),
-                large: true,
-                show: true,
-            });
-        } catch (e) {
-            Notification.exception(e);
-            return;
-        }
-
+    ModalFactory.create({
+        type: ModalFactory.types.CANCEL,
+        title: Str.get_string('usageheader', 'qbank_usage'),
+        body: getFragment(args, contextId),
+        large: true,
+    }).then((modal) => {
+        modal.show();
         modal.getRoot().on('click', 'a[href].page-link', function(e) {
             e.preventDefault();
             let attr = e.target.getAttribute("href");
             if (attr !== '#') {
                 args.querystring = attr;
-                modal.setBody(Fragment.loadFragment('qbank_usage', 'question_usage', contextId, args));
+                modal.setBody(getFragment(args, contextId));
             }
         });
-        // Version selection event.
-        modal.getRoot().on('change', '#question_usage_version_dropdown', function(e) {
-            args.questionid = e.target.value;
-            modal.setBody(Fragment.loadFragment('qbank_usage', 'question_usage', contextId, args));
-        });
-    } else {
-        modal.setBody(Fragment.loadFragment('qbank_usage', 'question_usage', contextId, args));
-        modal.show();
-    }
-
+        return modal;
+    }).fail(Notification.exception);
 };
 
 /**
  * Entrypoint of the js.
  *
  * @method init
- * @param {boolean} specificVersion Is the view listing specific question versions?
+ * @param {string} questionSelector the question usage identifier.
+ * @param {int} contextId the question context id.
  */
-export const init = (specificVersion = false) => {
-    const target = document.querySelector('#categoryquestions');
-    if (target !== null) {
-        target.addEventListener('click', (e) => {
-            if (e.target.dataset.target && e.target.dataset.target.includes('questionusagepreview')) {
-                // Call for the event listener to listed for clicks in any usage count row.
-                usageEvent(e.target.dataset.questionid, e.target.dataset.contextid, specificVersion);
-            }
-        });
-    }
+export const init = (questionSelector, contextId) => {
+    let target = document.querySelector(questionSelector);
+    let questionId = target.getAttribute('data-questionid');
+    target.addEventListener('click', () => {
+        // Call for the event listener to listed for clicks in any usage count row.
+        usageEvent(questionId, contextId);
+    });
 };

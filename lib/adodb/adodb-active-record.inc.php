@@ -281,7 +281,7 @@ class ADODB_Active_Record {
 
 	static function TableBelongsTo($table, $foreignRef, $foreignKey=false, $parentKey='', $parentClass = 'ADODB_Active_Record')
 	{
-		$ar = new ADODB_Active_Record($table);
+		$ar = new ADOdb_Active_Record($table);
 		$ar->belongsTo($foreignRef, $foreignKey, $parentKey, $parentClass);
 	}
 
@@ -290,7 +290,7 @@ class ADODB_Active_Record {
 		if (!is_array($tablePKey)) {
 			$tablePKey = array($tablePKey);
 		}
-		$ar = new ADODB_Active_Record($table, $tablePKey);
+		$ar = new ADOdb_Active_Record($table, $tablePKey);
 		$ar->belongsTo($foreignRef, $foreignKey, $parentKey, $parentClass);
 	}
 
@@ -501,8 +501,7 @@ class ADODB_Active_Record {
 			}
 			break;
 		default:
-			foreach($cols as $fldobj) {
-				$name = $fldobj->name;
+			foreach($cols as $name => $fldobj) {
 
 				if ($ADODB_ACTIVE_DEFVALS && isset($fldobj->default_value)) {
 					$this->$name = $fldobj->default_value;

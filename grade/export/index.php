@@ -37,21 +37,14 @@ require_login($course);
 $context = context_course::instance($courseid);
 require_capability('moodle/grade:export', $context);
 
-// Retrieve all grade export plugins the current user can access.
-$exportplugins = array_filter(core_component::get_plugin_list('gradeexport'),
-    static function(string $exportplugin) use ($context): bool {
-        return has_capability("gradeexport/{$exportplugin}:view", $context);
-    },
-    ARRAY_FILTER_USE_KEY
-);
-
+$exportplugins = core_component::get_plugin_list('gradeexport');
 if (!empty($exportplugins)) {
     $exportplugin = array_key_first($exportplugins);
     $url = new moodle_url("/grade/export/{$exportplugin}/index.php", ['id' => $courseid]);
     redirect($url);
 }
 
-// Otherwise, output the page with a notification stating that there are no available grade export options.
+// Otherwise, output the page with a notification stating that there are no available grade import options.
 $PAGE->set_title(get_string('export', 'grades'));
 $PAGE->set_pagelayout('incourse');
 $PAGE->set_heading($course->fullname);

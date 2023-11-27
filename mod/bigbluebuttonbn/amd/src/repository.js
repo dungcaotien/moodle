@@ -108,15 +108,13 @@ export const endMeeting = (bigbluebuttonbnid, groupid) => fetchMany([
 /**
  * Validate completion.
  *
- * @param {number} bigbluebuttonbnid
+ * @param {object} args
  * @returns {Promise}
  */
-export const completionValidate = (bigbluebuttonbnid) => fetchMany([
+export const completionValidate = args => fetchMany([
     {
         methodname: 'mod_bigbluebuttonbn_completion_validate',
-        args: {
-            bigbluebuttonbnid
-        },
+        args,
     }
 ])[0];
 

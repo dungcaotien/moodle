@@ -41,11 +41,11 @@ $adminroot = admin_get_root(); // need all settings
 $settingspage = $adminroot->locate($category, true);
 
 if (empty($settingspage) or !($settingspage instanceof admin_category)) {
-    throw new \moodle_exception('categoryerror', 'error', "$CFG->wwwroot/$CFG->admin/");
+    print_error('categoryerror', 'admin', "$CFG->wwwroot/$CFG->admin/");
 }
 
 if (!($settingspage->check_access())) {
-    throw new \moodle_exception('accessdenied', 'admin');
+    print_error('accessdenied', 'admin');
 }
 
 $hassiteconfig = has_capability('moodle/site:config', $PAGE->context);
@@ -131,7 +131,8 @@ if ($savebutton) {
     $outputhtml .= html_writer::end_tag('div');
 }
 
-$PAGE->set_title(implode(moodle_page::TITLE_SEPARATOR, $settingspage->visiblepath));
+$visiblepathtosection = array_reverse($settingspage->visiblepath);
+$PAGE->set_title("$SITE->shortname: " . implode(": ",$visiblepathtosection));
 $PAGE->set_heading($SITE->fullname);
 if ($buttons) {
     $PAGE->set_button($buttons);

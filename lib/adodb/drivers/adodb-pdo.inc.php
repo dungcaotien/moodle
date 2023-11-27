@@ -82,16 +82,9 @@ class ADODB_pdo extends ADOConnection {
 	var $_errormsg = false;
 	var $_errorno = false;
 
-	var $_stmt = false;
-
-	/** @var ADODB_pdo_base */
+	var $dsnType = '';
+	var $stmt = false;
 	var $_driver;
-
-	/** @var PDO */
-	var $_connectionID;
-
-	/** @var PDOStatement */
-	var $_queryID;
 
 	/*
 	* Describe parameters passed directly to the PDO driver
@@ -238,31 +231,11 @@ class ADODB_pdo extends ADOConnection {
 	function Concat()
 	{
 		$args = func_get_args();
-		if($this->_driver instanceof ADODB_pdo && method_exists($this->_driver, 'Concat')) {
+		if(method_exists($this->_driver, 'Concat')) {
 			return call_user_func_array(array($this->_driver, 'Concat'), $args);
 		}
 
-		return call_user_func_array(parent::class . '::Concat', $args);
-	}
-
-	/**
-	 * Triggers a driver-specific request for a bind parameter
-	 *
-	 * @param string $name
-	 * @param string $type
-	 *
-	 * @return string
-	 */
-	public function param($name,$type='C') {
-
-		$args = func_get_args();
-		if($this->_driver instanceof ADODB_pdo && method_exists($this->_driver, 'param')) {
-			// Return the driver specific entry, that mimics the native driver
-			return call_user_func_array(array($this->_driver, 'param'), $args);
-		}
-
-		// No driver specific method defined, use mysql format '?'
-		return call_user_func_array(parent::class . '::param', $args);
+		return call_user_func_array('parent::Concat', $args);
 	}
 
 	// returns true or false
@@ -321,19 +294,18 @@ class ADODB_pdo extends ADOConnection {
 	}
 
 	/**
-	 * Returns a list of Foreign Keys associated with a specific table.
+	 * Returns a list of Foreign Keys for a specified table.
 	 *
 	 * @param string   $table
-	 * @param string   $owner      (optional) not used in this driver
+	 * @param bool     $owner      (optional) not used in this driver
 	 * @param bool     $upper
 	 * @param bool     $associative
 	 *
-	 * @return string[]|false An array where keys are tables, and values are foreign keys;
-	 *                        false if no foreign keys could be found.
+	 * @return string[] where keys are tables, and values are foreign keys
 	 */
-	public function metaForeignKeys($table, $owner = '', $upper = false, $associative = false) {
+	public function metaForeignKeys($table, $owner=false, $upper=false,$associative=false) {
 		if (method_exists($this->_driver,'metaForeignKeys'))
-			return $this->_driver->metaForeignKeys($table, $owner, $upper, $associative);
+			return $this->_driver->metaForeignKeys($table,$owner,$upper,$associative);
 	}
 
 	/**
@@ -449,14 +421,14 @@ class ADODB_pdo extends ADOConnection {
 	 */
 	function SetAutoCommit($auto_commit)
 	{
-		if($this->_driver instanceof ADODB_pdo && method_exists($this->_driver, 'SetAutoCommit')) {
+		if(method_exists($this->_driver, 'SetAutoCommit')) {
 			$this->_driver->SetAutoCommit($auto_commit);
 		}
 	}
 
 	function SetTransactionMode($transaction_mode)
 	{
-		if($this->_driver instanceof ADODB_pdo && method_exists($this->_driver, 'SetTransactionMode')) {
+		if(method_exists($this->_driver, 'SetTransactionMode')) {
 			return $this->_driver->SetTransactionMode($transaction_mode);
 		}
 
@@ -465,7 +437,7 @@ class ADODB_pdo extends ADOConnection {
 
 	function beginTrans()
 	{
-		if($this->_driver instanceof ADODB_pdo && method_exists($this->_driver, 'beginTrans')) {
+		if(method_exists($this->_driver, 'beginTrans')) {
 			return $this->_driver->beginTrans();
 		}
 
@@ -485,7 +457,7 @@ class ADODB_pdo extends ADOConnection {
 	function commitTrans($ok=true)
 	{
 
-		if($this->_driver instanceof ADODB_pdo && method_exists($this->_driver, 'commitTrans')) {
+		if(method_exists($this->_driver, 'commitTrans')) {
 			return $this->_driver->commitTrans($ok);
 		}
 
@@ -510,7 +482,7 @@ class ADODB_pdo extends ADOConnection {
 
 	function RollbackTrans()
 	{
-		if($this->_driver instanceof ADODB_pdo && method_exists($this->_driver, 'RollbackTrans')) {
+		if(method_exists($this->_driver, 'RollbackTrans')) {
 			return $this->_driver->RollbackTrans();
 		}
 
@@ -552,7 +524,7 @@ class ADODB_pdo extends ADOConnection {
 
 	public function createSequence($seqname='adodbseq',$startID=1)
 	{
-		if($this->_driver instanceof ADODB_pdo && method_exists($this->_driver, 'createSequence')) {
+		if(method_exists($this->_driver, 'createSequence')) {
 			return $this->_driver->createSequence($seqname, $startID);
 		}
 
@@ -561,7 +533,7 @@ class ADODB_pdo extends ADOConnection {
 
 	function DropSequence($seqname='adodbseq')
 	{
-		if($this->_driver instanceof ADODB_pdo && method_exists($this->_driver, 'DropSequence')) {
+		if(method_exists($this->_driver, 'DropSequence')) {
 			return $this->_driver->DropSequence($seqname);
 		}
 
@@ -570,7 +542,7 @@ class ADODB_pdo extends ADOConnection {
 
 	function GenID($seqname='adodbseq',$startID=1)
 	{
-		if($this->_driver instanceof ADODB_pdo && method_exists($this->_driver, 'GenID')) {
+		if(method_exists($this->_driver, 'GenID')) {
 			return $this->_driver->GenID($seqname, $startID);
 		}
 
@@ -593,7 +565,6 @@ class ADODB_pdo extends ADOConnection {
 				$this->_driver->debug = $this->debug;
 			}
 			if ($inputarr) {
-
 				/*
 				* inputarr must be numeric
 				*/
@@ -669,9 +640,6 @@ class ADODB_pdo extends ADOConnection {
 
 }
 
-/**
- * Base class for Database-specific PDO drivers.
- */
 class ADODB_pdo_base extends ADODB_pdo {
 
 	var $sysDate = "'?'";
@@ -789,9 +757,6 @@ class ADORecordSet_pdo extends ADORecordSet {
 	var $bind = false;
 	var $databaseType = "pdo";
 	var $dataProvider = "pdo";
-
-	/** @var PDOStatement */
-	var $_queryID;
 
 	function __construct($id,$mode=false)
 	{
@@ -933,7 +898,4 @@ class ADORecordSet_pdo extends ADORecordSet {
 
 }
 
-class ADORecordSet_array_pdo extends ADORecordSet_array {
-	/** @var PDOStatement */
-	var $_queryID;
-}
+class ADORecordSet_array_pdo extends ADORecordSet_array {}

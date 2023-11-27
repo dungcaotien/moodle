@@ -17,27 +17,6 @@ class mnet_environment {
     var $keypair            = array();
     var $deleted            = 0;
 
-    /** @var string mnet host name. */
-    public $name;
-
-    /** @var int mnet host transport. */
-    public $transport;
-
-    /** @var int mnet host port number. */
-    public $portno;
-
-    /** @var int mnet host force theme. */
-    public $force_theme;
-
-    /** @var string mnet host theme. */
-    public $theme;
-
-    /** @var int mnet host application ID. */
-    public $applicationid;
-
-    /** @var int mnet host SSL verification. */
-    public $sslverification;
-
     function init() {
         global $CFG, $DB;
 
@@ -163,7 +142,10 @@ class mnet_environment {
         set_config('openssl', implode('@@@@@@@@', $this->keypair), 'mnet');
 
         $DB->update_record('mnet_host', $this);
-        error_log('New public key has been generated. It expires ' . date('Y/m/d h:i:s', $this->public_key_expires));
+        if (!PHPUNIT_TEST) {
+            // We don't want to output this log for PHPUnit since it will make the test to fail as risky.
+            error_log('New public key has been generated. It expires ' . date('Y/m/d h:i:s', $this->public_key_expires));
+        }
     }
 
     function get_private_key() {

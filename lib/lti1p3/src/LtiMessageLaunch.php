@@ -2,14 +2,13 @@
 
 namespace Packback\Lti1p3;
 
-use Exception;
 use Firebase\JWT\ExpiredException;
 use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
-use GuzzleHttp\Exception\TransferException;
 use Packback\Lti1p3\Interfaces\ICache;
 use Packback\Lti1p3\Interfaces\ICookie;
 use Packback\Lti1p3\Interfaces\IDatabase;
+use Packback\Lti1p3\Interfaces\IHttpException;
 use Packback\Lti1p3\Interfaces\ILtiServiceConnector;
 use Packback\Lti1p3\MessageValidators\DeepLinkMessageValidator;
 use Packback\Lti1p3\MessageValidators\ResourceMessageValidator;
@@ -20,31 +19,27 @@ class LtiMessageLaunch
     public const TYPE_DEEPLINK = 'LtiDeepLinkingRequest';
     public const TYPE_SUBMISSIONREVIEW = 'LtiSubmissionReviewRequest';
     public const TYPE_RESOURCELINK = 'LtiResourceLinkRequest';
+
     public const ERR_FETCH_PUBLIC_KEY = 'Failed to fetch public key.';
     public const ERR_NO_PUBLIC_KEY = 'Unable to find public key.';
-    public const ERR_NO_MATCHING_PUBLIC_KEY = 'Unable to find a public key which matches your JWT.';
-    public const ERR_STATE_NOT_FOUND = 'Please make sure you have cookies enabled in this browser and that you are not in private or incognito mode';
+    public const ERR_STATE_NOT_FOUND = 'State not found. Please make sure you have cookies enabled in this browser.';
     public const ERR_MISSING_ID_TOKEN = 'Missing id_token.';
     public const ERR_INVALID_ID_TOKEN = 'Invalid id_token, JWT must contain 3 parts';
     public const ERR_MISSING_NONCE = 'Missing Nonce.';
     public const ERR_INVALID_NONCE = 'Invalid Nonce.';
-
-    /**
-     * :issuerUrl and :clientId are used to substitute the queried issuerUrl
-     * and clientId. Do not change those substrings without changing how the
-     * error message is built.
-     */
-    public const ERR_MISSING_REGISTRATION = 'LTI 1.3 Registration not found for Issuer :issuerUrl and Client ID :clientId. Please make sure the LMS has provided the right information, and that the LMS has been registered correctly in the tool.';
+    public const ERR_MISSING_REGISTRATION = 'Registration not found. Please have your admin confirm your Issuer URL, client ID, and deployment ID.';
     public const ERR_CLIENT_NOT_REGISTERED = 'Client id not registered for this issuer.';
     public const ERR_NO_KID = 'No KID specified in the JWT Header.';
     public const ERR_INVALID_SIGNATURE = 'Invalid signature on id_token';
     public const ERR_MISSING_DEPLOYEMENT_ID = 'No deployment ID was specified';
     public const ERR_NO_DEPLOYMENT = 'Unable to find deployment.';
     public const ERR_INVALID_MESSAGE_TYPE = 'Invalid message type';
+    public const ERR_VALIDATOR_CONFLICT = 'Validator conflict.';
     public const ERR_UNRECOGNIZED_MESSAGE_TYPE = 'Unrecognized message type.';
     public const ERR_INVALID_MESSAGE = 'Message validation failed.';
-    public const ERR_INVALID_ALG = 'Invalid alg was specified in the JWT header.';
-    public const ERR_MISMATCHED_ALG_KEY = 'The alg specified in the JWT header is incompatible with the JWK key type.';
+    public const ERR_INVALID_ALG = 'Invalid alg specified in the JWT header';
+    public const ERR_MISMATCHED_ALG_KEY = 'Alg specified in the JWT header is incompatible with the JWK key type';
+
     private $db;
     private $cache;
     private $cookie;
@@ -61,16 +56,16 @@ class LtiMessageLaunch
         'RS512' => 'RSA',
         'ES256' => 'EC',
         'ES384' => 'EC',
-        'ES512' => 'EC',
+        'ES512' => 'EC'
     ];
 
     /**
      * Constructor.
      *
-     * @param  IDatabase  $database         Instance of the database interface used for looking up registrations and deployments
-     * @param  ICache  $cache            Instance of the Cache interface used to loading and storing launches
-     * @param  ICookie  $cookie           Instance of the Cookie interface used to set and read cookies
-     * @param  ILtiServiceConnector  $serviceConnector Instance of the LtiServiceConnector used to by LTI services to make API requests
+     * @param IDatabase            $database         instance of the database interface used for looking up registrations and deployments
+     * @param ICache               $cache            instance of the Cache interface used to loading and storing launches
+     * @param ICookie              $cookie           instance of the Cookie interface used to set and read cookies
+     * @param ILtiServiceConnector $serviceConnector instance of the LtiServiceConnector used to by LTI services to make API requests
      */
     public function __construct(
         IDatabase $database,
@@ -95,26 +90,26 @@ class LtiMessageLaunch
         ICache $cache = null,
         ICookie $cookie = null,
         ILtiServiceConnector $serviceConnector = null
-    ) {
+        ) {
         return new LtiMessageLaunch($database, $cache, $cookie, $serviceConnector);
     }
 
     /**
      * Load an LtiMessageLaunch from a Cache using a launch id.
      *
-     * @param  string  $launch_id The launch id of the LtiMessageLaunch object that is being pulled from the cache
-     * @param  IDatabase  $database  Instance of the database interface used for looking up registrations and deployments
-     * @param  ICache  $cache     Instance of the Cache interface used to loading and storing launches. If non is provided launch data will be store in $_SESSION.
-     * @return LtiMessageLaunch A populated and validated LtiMessageLaunch
+     * @param string    $launch_id the launch id of the LtiMessageLaunch object that is being pulled from the cache
+     * @param IDatabase $database  instance of the database interface used for looking up registrations and deployments
+     * @param ICache    $cache     Instance of the Cache interface used to loading and storing launches. If non is provided launch data will be store in $_SESSION.
      *
-     * @throws LtiException Will throw an LtiException if validation fails or launch cannot be found
+     * @throws LtiException will throw an LtiException if validation fails or launch cannot be found
+     *
+     * @return LtiMessageLaunch a populated and validated LtiMessageLaunch
      */
-    public static function fromCache(
-        $launch_id,
+    public static function fromCache($launch_id,
         IDatabase $database,
         ICache $cache = null,
-        ILtiServiceConnector $serviceConnector = null
-    ) {
+        ILtiServiceConnector $serviceConnector = null)
+    {
         $new = new LtiMessageLaunch($database, $cache, null, $serviceConnector);
         $new->launch_id = $launch_id;
         $new->jwt = ['body' => $new->cache->getLaunchData($launch_id)];
@@ -125,10 +120,11 @@ class LtiMessageLaunch
     /**
      * Validates all aspects of an incoming LTI message launch and caches the launch if successful.
      *
-     * @param  array|string  $request An array of post request parameters. If not set will default to $_POST.
-     * @return LtiMessageLaunch Will return $this if validation is successful
+     * @param array|string $request An array of post request parameters. If not set will default to $_POST.
      *
-     * @throws LtiException Will throw an LtiException if validation fails
+     * @throws LtiException will throw an LtiException if validation fails
+     *
+     * @return LtiMessageLaunch will return $this if validation is successful
      */
     public function validate(array $request = null)
     {
@@ -150,7 +146,7 @@ class LtiMessageLaunch
     /**
      * Returns whether or not the current launch can use the names and roles service.
      *
-     * @return bool Returns a boolean indicating the availability of names and roles
+     * @return bool returns a boolean indicating the availability of names and roles
      */
     public function hasNrps()
     {
@@ -160,21 +156,20 @@ class LtiMessageLaunch
     /**
      * Fetches an instance of the names and roles service for the current launch.
      *
-     * @return LtiNamesRolesProvisioningService An instance of the names and roles service that can be used to make calls within the scope of the current launch
+     * @return LtiNamesRolesProvisioningService an instance of the names and roles service that can be used to make calls within the scope of the current launch
      */
     public function getNrps()
     {
         return new LtiNamesRolesProvisioningService(
             $this->serviceConnector,
             $this->registration,
-            $this->jwt['body'][LtiConstants::NRPS_CLAIM_SERVICE]
-        );
+            $this->jwt['body'][LtiConstants::NRPS_CLAIM_SERVICE]);
     }
 
     /**
      * Returns whether or not the current launch can use the groups service.
      *
-     * @return bool Returns a boolean indicating the availability of groups
+     * @return bool returns a boolean indicating the availability of groups
      */
     public function hasGs()
     {
@@ -184,21 +179,20 @@ class LtiMessageLaunch
     /**
      * Fetches an instance of the groups service for the current launch.
      *
-     * @return LtiCourseGroupsService An instance of the groups service that can be used to make calls within the scope of the current launch
+     * @return LtiCourseGroupsService an instance of the groups service that can be used to make calls within the scope of the current launch
      */
     public function getGs()
     {
         return new LtiCourseGroupsService(
             $this->serviceConnector,
             $this->registration,
-            $this->jwt['body'][LtiConstants::GS_CLAIM_SERVICE]
-        );
+            $this->jwt['body'][LtiConstants::GS_CLAIM_SERVICE]);
     }
 
     /**
      * Returns whether or not the current launch can use the assignments and grades service.
      *
-     * @return bool Returns a boolean indicating the availability of assignments and grades
+     * @return bool returns a boolean indicating the availability of assignments and grades
      */
     public function hasAgs()
     {
@@ -208,21 +202,20 @@ class LtiMessageLaunch
     /**
      * Fetches an instance of the assignments and grades service for the current launch.
      *
-     * @return LtiAssignmentsGradesService An instance of the assignments an grades service that can be used to make calls within the scope of the current launch
+     * @return LtiAssignmentsGradesService an instance of the assignments an grades service that can be used to make calls within the scope of the current launch
      */
     public function getAgs()
     {
         return new LtiAssignmentsGradesService(
             $this->serviceConnector,
             $this->registration,
-            $this->jwt['body'][LtiConstants::AGS_CLAIM_ENDPOINT]
-        );
+            $this->jwt['body'][LtiConstants::AGS_CLAIM_ENDPOINT]);
     }
 
     /**
      * Returns whether or not the current launch is a deep linking launch.
      *
-     * @return bool Returns true if the current launch is a deep linking launch
+     * @return bool returns true if the current launch is a deep linking launch
      */
     public function isDeepLinkLaunch()
     {
@@ -232,21 +225,20 @@ class LtiMessageLaunch
     /**
      * Fetches a deep link that can be used to construct a deep linking response.
      *
-     * @return LtiDeepLink An instance of a deep link to construct a deep linking response for the current launch
+     * @return LtiDeepLink an instance of a deep link to construct a deep linking response for the current launch
      */
     public function getDeepLink()
     {
         return new LtiDeepLink(
             $this->registration,
             $this->jwt['body'][LtiConstants::DEPLOYMENT_ID],
-            $this->jwt['body'][LtiConstants::DL_DEEP_LINK_SETTINGS]
-        );
+            $this->jwt['body'][LtiConstants::DL_DEEP_LINK_SETTINGS]);
     }
 
     /**
      * Returns whether or not the current launch is a submission review launch.
      *
-     * @return bool Returns true if the current launch is a submission review launch
+     * @return bool returns true if the current launch is a submission review launch
      */
     public function isSubmissionReviewLaunch()
     {
@@ -256,7 +248,7 @@ class LtiMessageLaunch
     /**
      * Returns whether or not the current launch is a resource launch.
      *
-     * @return bool Returns true if the current launch is a resource launch
+     * @return bool returns true if the current launch is a resource launch
      */
     public function isResourceLaunch()
     {
@@ -266,7 +258,7 @@ class LtiMessageLaunch
     /**
      * Fetches the decoded body of the JWT used in the current launch.
      *
-     * @return array|object Returns the decoded json body of the launch as an array
+     * @return array|object returns the decoded json body of the launch as an array
      */
     public function getLaunchData()
     {
@@ -276,38 +268,22 @@ class LtiMessageLaunch
     /**
      * Get the unique launch id for the current launch.
      *
-     * @return string A unique identifier used to re-reference the current launch in subsequent requests
+     * @return string a unique identifier used to re-reference the current launch in subsequent requests
      */
     public function getLaunchId()
     {
         return $this->launch_id;
     }
 
-    public static function getMissingRegistrationErrorMsg(string $issuerUrl, string $clientId = null): string
-    {
-        // Guard against client ID being null
-        if (!isset($clientId)) {
-            $clientId = '(N/A)';
-        }
-
-        $search = [':issuerUrl', ':clientId'];
-        $replace = [$issuerUrl, $clientId];
-
-        return str_replace($search, $replace, static::ERR_MISSING_REGISTRATION);
-    }
-
     private function getPublicKey()
     {
-        $request = new ServiceRequest(
-            ServiceRequest::METHOD_GET,
-            $this->registration->getKeySetUrl(),
-            ServiceRequest::TYPE_GET_KEYSET
-        );
+        $keySetUrl = $this->registration->getKeySetUrl();
+        $request = new ServiceRequest(LtiServiceConnector::METHOD_GET, $keySetUrl);
 
         // Download key set
         try {
             $response = $this->serviceConnector->makeRequest($request);
-        } catch (TransferException $e) {
+        } catch (IHttpException $e) {
             throw new LtiException(static::ERR_NO_PUBLIC_KEY);
         }
         $publicKeySet = $this->serviceConnector->getResponseBody($response);
@@ -320,13 +296,15 @@ class LtiMessageLaunch
         // Find key used to sign the JWT (matches the KID in the header)
         foreach ($publicKeySet['keys'] as $key) {
             if ($key['kid'] == $this->jwt['header']['kid']) {
-                $key['alg'] = $this->getKeyAlgorithm($key);
+                // If alg is omitted from the JWK (valid, see https://datatracker.ietf.org/doc/html/rfc7517#section-4.4),
+                // infer it from the JWT header alg.
+                $key['alg'] = empty($key['alg']) ? $this->inferKeyAlgorithm($key) : $key['alg'];
 
                 try {
                     $keySet = JWK::parseKeySet([
                         'keys' => [$key],
                     ]);
-                } catch (Exception $e) {
+                } catch (\Exception $e) {
                     // Do nothing
                 }
 
@@ -337,33 +315,18 @@ class LtiMessageLaunch
         }
 
         // Could not find public key with a matching kid and alg.
-        throw new LtiException(static::ERR_NO_MATCHING_PUBLIC_KEY);
+        throw new LtiException(static::ERR_NO_PUBLIC_KEY);
     }
 
-    /**
-     * If alg is omitted from the JWK, infer it from the JWT header alg.
-     * See https://datatracker.ietf.org/doc/html/rfc7517#section-4.4.
-     */
-    private function getKeyAlgorithm(array $key): string
+    private function inferKeyAlgorithm(array $key): string
     {
-        if (isset($key['alg'])) {
-            return $key['alg'];
-        }
-
         // The header alg must match the key type (family) specified in the JWK's kty.
-        if ($this->jwtAlgMatchesJwkKty($key)) {
-            return $this->jwt['header']['alg'];
+        if (!isset(static::$ltiSupportedAlgs[$this->jwt['header']['alg']]) ||
+                static::$ltiSupportedAlgs[$this->jwt['header']['alg']] != $key['kty']) {
+            throw new LtiException(static::ERR_MISMATCHED_ALG_KEY);
         }
 
-        throw new LtiException(static::ERR_MISMATCHED_ALG_KEY);
-    }
-
-    private function jwtAlgMatchesJwkKty($key): bool
-    {
-        $jwtAlg = $this->jwt['header']['alg'];
-
-        return isset(static::$ltiSupportedAlgs[$jwtAlg]) &&
-            static::$ltiSupportedAlgs[$jwtAlg] === $key['kty'];
+        return $this->jwt['header']['alg'];
     }
 
     private function cacheLaunchData()
@@ -423,16 +386,15 @@ class LtiMessageLaunch
     private function validateRegistration()
     {
         // Find registration.
-        $clientId = is_array($this->jwt['body']['aud']) ? $this->jwt['body']['aud'][0] : $this->jwt['body']['aud'];
-        $issuerUrl = $this->jwt['body']['iss'];
-        $this->registration = $this->db->findRegistrationByIssuer($issuerUrl, $clientId);
+        $client_id = is_array($this->jwt['body']['aud']) ? $this->jwt['body']['aud'][0] : $this->jwt['body']['aud'];
+        $this->registration = $this->db->findRegistrationByIssuer($this->jwt['body']['iss'], $client_id);
 
         if (empty($this->registration)) {
-            throw new LtiException($this->getMissingRegistrationErrorMsg($issuerUrl, $clientId));
+            throw new LtiException(static::ERR_MISSING_REGISTRATION);
         }
 
         // Check client id.
-        if ($clientId !== $this->registration->getClientId()) {
+        if ($client_id !== $this->registration->getClientId()) {
             // Client not registered.
             throw new LtiException(static::ERR_CLIENT_NOT_REGISTERED);
         }
@@ -446,13 +408,16 @@ class LtiMessageLaunch
             throw new LtiException(static::ERR_NO_KID);
         }
 
+        if (!in_array($this->jwt['header']['alg'], array_keys(static::$ltiSupportedAlgs))) {
+            throw new LtiException(static::ERR_INVALID_ALG);
+        }
+
         // Fetch public key.
         $public_key = $this->getPublicKey();
 
         // Validate JWT signature
         try {
-            $headers = new \stdClass();
-            JWT::decode($this->request['id_token'], $public_key, $headers);
+            JWT::decode($this->request['id_token'], $public_key);
         } catch (ExpiredException $e) {
             // Error validating signature.
             throw new LtiException(static::ERR_INVALID_SIGNATURE);
@@ -486,31 +451,36 @@ class LtiMessageLaunch
             throw new LtiException(static::ERR_INVALID_MESSAGE_TYPE);
         }
 
-        $validator = $this->getMessageValidator($this->jwt['body']);
+        /**
+         * @todo Fix this nonsense
+         */
 
-        if (!isset($validator)) {
+        // Create instances of all validators
+        $validators = [
+            new DeepLinkMessageValidator(),
+            new ResourceMessageValidator(),
+            new SubmissionReviewMessageValidator(),
+        ];
+
+        $message_validator = false;
+        foreach ($validators as $validator) {
+            if ($validator->canValidate($this->jwt['body'])) {
+                if ($message_validator !== false) {
+                    // Can't have more than one validator apply at a time.
+                    throw new LtiException(static::ERR_VALIDATOR_CONFLICT);
+                }
+                $message_validator = $validator;
+            }
+        }
+
+        if ($message_validator === false) {
             throw new LtiException(static::ERR_UNRECOGNIZED_MESSAGE_TYPE);
         }
 
-        $validator::validate($this->jwt['body']);
+        if (!$message_validator->validate($this->jwt['body'])) {
+            throw new LtiException(static::ERR_INVALID_MESSAGE);
+        }
 
         return $this;
-    }
-
-    private function getMessageValidator(array $jwtBody): ?string
-    {
-        $availableValidators = [
-            DeepLinkMessageValidator::class,
-            ResourceMessageValidator::class,
-            SubmissionReviewMessageValidator::class,
-        ];
-
-        // Filter out validators that cannot validate the message
-        $applicableValidators = array_filter($availableValidators, function ($validator) use ($jwtBody) {
-            return $validator::canValidate($jwtBody);
-        });
-
-        // There should be 0-1 validators. This will either return the validator, or null if none apply.
-        return array_shift($applicableValidators);
     }
 }

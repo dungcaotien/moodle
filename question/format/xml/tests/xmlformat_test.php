@@ -1588,7 +1588,6 @@ END;
     </generalfeedback>
     <penalty>0.5</penalty>
     <hidden>0</hidden>
-    <idnumber>id-101</idnumber>
     <hint format="html">
       <text>Hint 1</text>
     </hint>
@@ -1613,7 +1612,6 @@ END;
         $expectedqa->name = 'Simple multianswer';
         $expectedqa->qtype = 'multianswer';
         $expectedqa->questiontext = 'Complete this opening line of verse: "The {#1} and the {#2} went to sea".';
-        $expectedqa->idnumber = 'id-101';
         $expectedqa->generalfeedback =
                 'General feedback: It\'s from "The Owl and the Pussy-cat" by Lear: "The owl and the pussycat went to sea".';
         $expectedqa->defaultmark = 2;

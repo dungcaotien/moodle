@@ -103,17 +103,6 @@ class enrol_guest_plugin extends enrol_plugin {
             if ($USER->enrol_guest_passwords[$instance->id] === $instance->password) {
                 $allow = true;
             }
-        } else if (WS_SERVER) { // Mobile app mostly.
-            $storedpass = get_user_preferences('enrol_guest_ws_password_'. $instance->id);
-            // We check first if there is a supplied password.
-            if (!is_null($storedpass)) {
-                $allow = $storedpass === $instance->password;
-
-                if (!$allow) {
-                    // Reset, probably the course password was changed.
-                    unset_user_preference('enrol_guest_ws_password_' . $instance->id);
-                }
-            }
         }
 
         if ($allow) {
@@ -489,35 +478,6 @@ class enrol_guest_plugin extends enrol_plugin {
         return $errors;
     }
 
-    /**
-     * Check if enrolment plugin is supported in csv course upload.
-     *
-     * @return bool
-     */
-    public function is_csv_upload_supported(): bool {
-        return true;
-    }
-
-    /**
-     * Finds matching instances for a given course.
-     *
-     * @param array $enrolmentdata enrolment data.
-     * @param int $courseid Course ID.
-     * @return stdClass|null Matching instance
-     */
-    public function find_instance(array $enrolmentdata, int $courseid) : ?stdClass {
-
-        $instances = enrol_get_instances($courseid, false);
-        $instance = null;
-        foreach ($instances as $i) {
-            if ($i->enrol == 'guest') {
-                // There can be only one guest enrol instance so find first available.
-                $instance = $i;
-                break;
-            }
-        }
-        return $instance;
-    }
 
 }
 

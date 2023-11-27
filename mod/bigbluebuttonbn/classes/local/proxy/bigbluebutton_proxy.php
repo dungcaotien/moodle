@@ -26,7 +26,6 @@ use mod_bigbluebuttonbn\local\exceptions\bigbluebutton_exception;
 use mod_bigbluebuttonbn\local\exceptions\server_not_available_exception;
 use moodle_url;
 use stdClass;
-use user_picture;
 
 /**
  * The bigbluebutton proxy class.
@@ -42,104 +41,50 @@ use user_picture;
 class bigbluebutton_proxy extends proxy_base {
 
     /**
-     * Minimum poll interval for remote bigbluebutton server in seconds.
-     */
-    const MIN_POLL_INTERVAL = 2;
-
-    /**
-     * Default poll interval for remote bigbluebutton server in seconds.
-     */
-    const DEFAULT_POLL_INTERVAL = 5;
-
-    /**
-     * Builds and returns a url for joining a BigBlueButton meeting.
+     * Builds and returns a url for joining a bigbluebutton meeting.
      *
-     * @param instance $instance
+     * @param string $meetingid
+     * @param string $username
+     * @param string $pw
+     * @param string $logouturl
+     * @param string $role
+     * @param string|null $configtoken
+     * @param string|null $userid
      * @param string|null $createtime
      *
      * @return string
      */
     public static function get_join_url(
-        instance $instance,
-        ?string $createtime
-    ): string {
-        return self::internal_get_join_url($instance, $createtime);
-    }
-
-    /**
-     * Builds and returns a url for joining a BigBlueButton meeting.
-     *
-     * @param instance $instance
-     * @param string|null $createtime
-     * @param string $username
-     * @return string
-     */
-    public static function get_guest_join_url(
-        instance $instance,
-        ?string $createtime,
-        string $username
-    ): string {
-        return self::internal_get_join_url($instance, $createtime, $username, true);
-    }
-
-    /**
-     * Internal helper method to builds and returns a url for joining a BigBlueButton meeting.
-     *
-     * @param instance $instance
-     * @param string|null $jointime = null
-     * @param string|null $userfullname
-     * @param bool $isguestjoin
-     * @return string
-     */
-    private static function internal_get_join_url(
-        instance $instance,
-        ?string $jointime,
-        string $userfullname = null,
-        bool $isguestjoin = false
-    ): string {
+        string $meetingid,
+        string $username,
+        string $pw,
+        string $logouturl,
+        string $role,
+        string $configtoken = null,
+        string $userid = null,
+        string $createtime = null
+    ): ?string {
         $data = [
-            'meetingID' => $instance->get_meeting_id(),
-            'fullName' => $userfullname ?? $instance->get_user_fullname(),
-            'password' => $instance->get_current_user_password(),
-            'logoutURL' => $isguestjoin ? $instance->get_guest_access_url()->out(false) : $instance->get_logout_url()->out(false),
-            'role' => $instance->get_current_user_role()
+            'meetingID' => $meetingid,
+            'fullName' => $username,
+            'password' => $pw,
+            'logoutURL' => $logouturl,
+            'role' => $role
         ];
 
-        if (!$isguestjoin) {
-            $data['userID'] = $instance->get_user_id();
-            $data['guest'] = "false";
-        } else {
-            $data['guest'] = "true";
+        if (!is_null($configtoken)) {
+            $data['configToken'] = $configtoken;
         }
 
-        if (!is_null($jointime)) {
-            $data['createTime'] = $jointime;
+        if (!is_null($userid)) {
+            $data['userID'] = $userid;
         }
-        $currentlang = current_language();
-        if (!empty(trim($currentlang))) {
-            $data['userdata-bbb_override_default_locale'] = $currentlang;
-        }
-        if ($instance->is_profile_picture_enabled()) {
-            $user = $instance->get_user();
-            if (!empty($user->picture)) {
-                $data['avatarURL'] = self::get_avatar_url($user)->out(false);
-            }
-        }
-        return self::action_url('join', $data, [], $instance->get_instance_id());
-    }
 
-    /**
-     * Get user avatar URL
-     *
-     * @param stdClass $user
-     * @return moodle_url
-     */
-    private static function get_avatar_url(stdClass $user): moodle_url {
-        global $PAGE;
-        $userpicture = new user_picture($user);
-        $userpicture->includetoken = true;
-        $userpicture->size = 3; // Size f3.
-        return $userpicture->get_url($PAGE);
+        if (!is_null($createtime)) {
+            $data['createTime'] = $createtime;
+        }
+
+        return self::action_url('join', $data);
     }
 
     /**
@@ -464,7 +409,6 @@ class bigbluebutton_proxy extends proxy_base {
      * @param array $metadata
      * @param string|null $presentationname
      * @param string|null $presentationurl
-     * @param int|null $instanceid
      * @return array
      * @throws bigbluebutton_exception
      */
@@ -472,10 +416,9 @@ class bigbluebutton_proxy extends proxy_base {
         array $data,
         array $metadata,
         ?string $presentationname = null,
-        ?string $presentationurl = null,
-        ?int $instanceid = null
+        ?string $presentationurl = null
     ): array {
-        $createmeetingurl = self::action_url('create', $data, $metadata, $instanceid);
+        $createmeetingurl = self::action_url('create', $data, $metadata);
 
         $curl = new curl();
         if (!is_null($presentationname) && !is_null($presentationurl)) {
@@ -509,11 +452,10 @@ class bigbluebutton_proxy extends proxy_base {
      * Get meeting info for a given meeting id
      *
      * @param string $meetingid
-     * @param int|null $instanceid
      * @return array
      */
-    public static function get_meeting_info(string $meetingid, ?int $instanceid = null): array {
-        $xmlinfo = self::fetch_endpoint_xml('getMeetingInfo', ['meetingID' => $meetingid], [], $instanceid);
+    public static function get_meeting_info(string $meetingid): array {
+        $xmlinfo = self::fetch_endpoint_xml('getMeetingInfo', ['meetingID' => $meetingid]);
         self::assert_returned_xml($xmlinfo, ['meetingid' => $meetingid]);
         return (array) $xmlinfo;
     }
@@ -523,10 +465,9 @@ class bigbluebutton_proxy extends proxy_base {
      *
      * @param string $meetingid
      * @param string $modpw
-     * @param int|null $instanceid
      */
-    public static function end_meeting(string $meetingid, string $modpw, ?int $instanceid = null): void {
-        $xml = self::fetch_endpoint_xml('end', ['meetingID' => $meetingid, 'password' => $modpw], [], $instanceid);
+    public static function end_meeting(string $meetingid, string $modpw): void {
+        $xml = self::fetch_endpoint_xml('end', ['meetingID' => $meetingid, 'password' => $modpw]);
         self::assert_returned_xml($xml, ['meetingid' => $meetingid]);
     }
 
@@ -547,21 +488,5 @@ class bigbluebutton_proxy extends proxy_base {
         $hends = explode('.', $h);
         $hendslength = count($hends);
         return ($hends[$hendslength - 1] == 'com' && $hends[$hendslength - 2] == 'blindsidenetworks');
-    }
-
-    /**
-     * Get the poll interval as it is set in the configuration
-     *
-     * If configuration value is under the threshold of {@see self::MIN_POLL_INTERVAL},
-     * then return the {@see self::MIN_POLL_INTERVAL} value.
-     *
-     * @return int the poll interval in seconds
-     */
-    public static function get_poll_interval(): int {
-        $pollinterval = intval(config::get('poll_interval'));
-        if ($pollinterval < self::MIN_POLL_INTERVAL) {
-            $pollinterval = self::MIN_POLL_INTERVAL;
-        }
-        return $pollinterval;
     }
 }

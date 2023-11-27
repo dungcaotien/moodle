@@ -159,8 +159,8 @@ class enrol_self_plugin extends enrol_plugin {
 
         \core\notification::success(get_string('youenrolledincourse', 'enrol'));
 
-        // Test whether the password is also used as a group key.
-        if ($instance->password && $instance->customint1) {
+        if ($instance->password and $instance->customint1 and $data->enrolpassword !== $instance->password) {
+            // It must be a group enrolment, let's assign group too.
             $groups = $DB->get_records('groups', array('courseid'=>$instance->courseid), 'id', 'id, enrolmentkey');
             foreach ($groups as $group) {
                 if (empty($group->enrolmentkey)) {
@@ -403,7 +403,7 @@ class enrol_self_plugin extends enrol_plugin {
         $a->coursename = format_string($course->fullname, true, array('context'=>$context));
         $a->profileurl = "$CFG->wwwroot/user/view.php?id=$user->id&course=$course->id";
 
-        if (!is_null($instance->customtext1) && trim($instance->customtext1) !== '') {
+        if (trim($instance->customtext1) !== '') {
             $message = $instance->customtext1;
             $key = array('{$a->coursename}', '{$a->profileurl}', '{$a->fullname}', '{$a->email}');
             $value = array($a->coursename, $a->profileurl, fullname($user), $user->email);
@@ -876,9 +876,6 @@ class enrol_self_plugin extends enrol_plugin {
      * @return void
      */
     public function edit_instance_validation($data, $files, $instance, $context) {
-        global $CFG;
-        require_once("{$CFG->dirroot}/enrol/self/locallib.php");
-
         $errors = array();
 
         $checkpassword = false;
@@ -891,11 +888,6 @@ class enrol_self_plugin extends enrol_plugin {
 
             // Check the password if the instance is enabled and the password has changed.
             if (($data['status'] == ENROL_INSTANCE_ENABLED) && ($instance->password !== $data['password'])) {
-                $checkpassword = true;
-            }
-
-            // Check the password if we are enabling group enrolment keys.
-            if (!$instance->customint1 && $data['customint1']) {
                 $checkpassword = true;
             }
         } else {
@@ -912,10 +904,6 @@ class enrol_self_plugin extends enrol_plugin {
                 if (!check_password_policy($data['password'], $errmsg)) {
                     $errors['password'] = $errmsg;
                 }
-            } else if (!empty($data['password']) && $data['customint1'] &&
-                    enrol_self_check_group_enrolment_key($data['courseid'], $data['password'])) {
-
-                $errors['password'] = get_string('passwordmatchesgroupkey', 'enrol_self');
             }
         }
 
@@ -1079,37 +1067,6 @@ class enrol_self_plugin extends enrol_plugin {
 
         return $contact;
     }
-
-    /**
-     * Check if enrolment plugin is supported in csv course upload.
-     *
-     * @return bool
-     */
-    public function is_csv_upload_supported(): bool {
-        return true;
-    }
-
-    /**
-     * Finds matching instances for a given course.
-     *
-     * @param array $enrolmentdata enrolment data.
-     * @param int $courseid Course ID.
-     * @return stdClass|null Matching instance
-     */
-    public function find_instance(array $enrolmentdata, int $courseid) : ?stdClass {
-
-        $instances = enrol_get_instances($courseid, false);
-        $instance = null;
-        foreach ($instances as $i) {
-            if ($i->enrol == 'self') {
-                // This is bad - we can not really distinguish between self instances. So grab first available.
-                $instance = $i;
-                break;
-            }
-        }
-        return $instance;
-    }
-
 }
 
 /**

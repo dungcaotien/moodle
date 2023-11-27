@@ -16,12 +16,12 @@
 /**
  * JS for the mod_form page on mod_bigbluebuttonbn plugin.
  *
- * @module      mod_bigbluebuttonbn/modform
+ * @module      mod_bigbluebuttonbn/mod_form
  * @copyright   2021 Blindside Networks Inc
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-import {getString} from 'core/str';
+import {get_string as getString} from 'core/str';
 import Notification from 'core/notification';
 import Templates from "core/templates";
 
@@ -140,9 +140,6 @@ const applyInstanceTypeProfile = (profileType, isFeatureEnabled) => {
     // Show lock settings validation.
     showFieldset('id_lock', showAll ||
         isFeatureEnabled(profileType, 'lock'));
-    // Show guest settings validation.
-    showFieldset('id_guestaccess', showAll ||
-        isFeatureEnabled(profileType, 'showroom'));
     // Preuploadpresentation feature validation.
     showFieldset('id_preuploadpresentation', showAll ||
         isFeatureEnabled(profileType, 'preuploadpresentation'));

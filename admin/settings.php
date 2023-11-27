@@ -23,13 +23,13 @@ if (empty($settingspage) or !($settingspage instanceof admin_settingpage)) {
     if (moodle_needs_upgrading()) {
         redirect(new moodle_url('/admin/index.php'));
     } else {
-        throw new \moodle_exception('sectionerror', 'admin', "$CFG->wwwroot/$CFG->admin/");
+        print_error('sectionerror', 'admin', "$CFG->wwwroot/$CFG->admin/");
     }
     die;
 }
 
 if (!($settingspage->check_access())) {
-    throw new \moodle_exception('accessdenied', 'admin');
+    print_error('accessdenied', 'admin');
     die;
 }
 
@@ -129,7 +129,9 @@ if (empty($SITE->fullname)) {
         $PAGE->set_button($buttons);
     }
 
-    $PAGE->set_title(implode(moodle_page::TITLE_SEPARATOR, $settingspage->visiblepath));
+    $visiblepathtosection = array_reverse($settingspage->visiblepath);
+
+    $PAGE->set_title("$SITE->shortname: " . implode(": ",$visiblepathtosection));
     $PAGE->set_heading($SITE->fullname);
     echo $OUTPUT->header();
 

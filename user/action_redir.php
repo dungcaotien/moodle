@@ -35,11 +35,11 @@ list($formaction) = explode('?', $formaction, 2);
 $actions = array('bulkchange.php');
 
 if (array_search($formaction, $actions) === false) {
-    throw new \moodle_exception('unknownuseraction');
+    print_error('unknownuseraction');
 }
 
 if (!confirm_sesskey()) {
-    throw new \moodle_exception('confirmsesskeybad');
+    print_error('confirmsesskeybad');
 }
 
 if ($formaction == 'bulkchange.php') {
@@ -182,14 +182,14 @@ if ($formaction == 'bulkchange.php') {
             }
         }
         if (!$instance) {
-            throw new \moodle_exception('errorwithbulkoperation', 'enrol');
+            print_error('errorwithbulkoperation', 'enrol');
         }
 
         $manager = new course_enrolment_manager($PAGE, $course, $instance->id);
         $plugins = $manager->get_enrolment_plugins();
 
         if (!isset($plugins[$plugin])) {
-            throw new \moodle_exception('errorwithbulkoperation', 'enrol');
+            print_error('errorwithbulkoperation', 'enrol');
         }
 
         $plugin = $plugins[$plugin];
@@ -197,7 +197,7 @@ if ($formaction == 'bulkchange.php') {
         $operations = $plugin->get_bulk_operations($manager);
 
         if (!isset($operations[$operationname])) {
-            throw new \moodle_exception('errorwithbulkoperation', 'enrol');
+            print_error('errorwithbulkoperation', 'enrol');
         }
         $operation = $operations[$operationname];
 
@@ -230,12 +230,6 @@ if ($formaction == 'bulkchange.php') {
         };
         $filteredusers = array_filter($users, $matchesplugin);
 
-        // If the bulk operation is deleting enrolments, we exclude in any case the current user as it was probably a mistake.
-        if ($operationname === 'deleteselectedusers' && (!in_array($USER->id, $removed))) {
-            \core\notification::warning(get_string('userremovedfromselectiona', 'enrol', fullname($USER)));
-            unset($filteredusers[$USER->id]);
-        }
-
         if (empty($filteredusers)) {
             redirect($returnurl, get_string('noselectedusers', 'bulkusers'));
         }
@@ -250,7 +244,7 @@ if ($formaction == 'bulkchange.php') {
             if ($operation->process($manager, $users, new stdClass)) {
                 redirect($returnurl);
             } else {
-                throw new \moodle_exception('errorwithbulkoperation', 'enrol');
+                print_error('errorwithbulkoperation', 'enrol');
             }
         }
         // Check if the bulk operation has been cancelled.

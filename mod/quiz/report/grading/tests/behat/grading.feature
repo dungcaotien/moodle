@@ -166,7 +166,7 @@ Feature: Basic use of the Manual grading report
     And I should see "Separate groups: All participants"
     Then I should see "Sorry, but you need to be part of a group to see this page."
 
-  @javascript @editor_atto
+  @javascript
   Scenario: Manual grading report with attempts to be graded
     Given the following "questions" exist:
       | questioncategory | qtype | name     | user  | questiontext    |
@@ -180,19 +180,19 @@ Feature: Basic use of the Manual grading report
     And I set the field with xpath "//*[contains(concat(' ', @class, ' '), ' editor_atto_content ')]" to "This is my attempt 1"
     And I follow "Finish attempt ..."
     And I press "Submit all and finish"
-    And I click on "Submit all and finish" "button" in the "Submit all your answers and finish?" "dialogue"
+    And I click on "Submit all and finish" "button" in the "Confirmation" "dialogue"
     And I click on "Finish review" "link"
     And I press "Re-attempt quiz"
     And I set the field with xpath "//*[contains(concat(' ', @class, ' '), ' editor_atto_content ')]" to "This is my attempt 2"
     And I follow "Finish attempt ..."
     And I press "Submit all and finish"
-    And I click on "Submit all and finish" "button" in the "Submit all your answers and finish?" "dialogue"
+    And I click on "Submit all and finish" "button" in the "Confirmation" "dialogue"
     And I click on "Finish review" "link"
     And I press "Re-attempt quiz"
     And I set the field with xpath "//*[contains(concat(' ', @class, ' '), ' editor_atto_content ')]" to "This is my attempt 3"
     And I follow "Finish attempt ..."
     And I press "Submit all and finish"
-    And I click on "Submit all and finish" "button" in the "Submit all your answers and finish?" "dialogue"
+    And I click on "Submit all and finish" "button" in the "Confirmation" "dialogue"
     And I log out
 
     And I am on the "Quiz 2" "mod_quiz > Manual grading report" page logged in as "teacher1"
@@ -201,7 +201,7 @@ Feature: Basic use of the Manual grading report
     And "Essay Q1" row "To grade" column of "questionstograde" table should contain "3"
     And "Essay Q1" row "Already graded" column of "questionstograde" table should contain "0"
     # Go to the grading page.
-    And I click on "Grade" "link" in the "Essay Q1" "table_row"
+    And I click on "grade" "link" in the "Essay Q1" "table_row"
     And I should see "Grading attempts 1 to 3 of 3"
     And I set the following fields to these values:
       | Questions per page | 1         |

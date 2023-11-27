@@ -18,8 +18,8 @@ declare(strict_types=1);
 
 namespace core_reportbuilder\output;
 
+use core_external;
 use core\output\inplace_editable;
-use core_external\external_api;
 use core_reportbuilder\permission;
 use core_reportbuilder\local\models\schedule;
 
@@ -46,9 +46,7 @@ class schedule_name_editable extends inplace_editable {
         $report = $schedule->get_report();
         $editable = permission::can_edit_report($report);
 
-        $displayvalue = $schedule->get_formatted_name($report->get_context());
-
-        parent::__construct('core_reportbuilder', 'schedulename', $schedule->get('id'), $editable, $displayvalue,
+        parent::__construct('core_reportbuilder', 'schedulename', $schedule->get('id'), $editable, $schedule->get_formatted_name(),
             $schedule->get('name'), get_string('editschedulename', 'core_reportbuilder'));
     }
 
@@ -64,7 +62,7 @@ class schedule_name_editable extends inplace_editable {
 
         $report = $schedule->get_report();
 
-        external_api::validate_context($report->get_context());
+        core_external::validate_context($report->get_context());
         permission::require_can_edit_report($report);
 
         $value = trim(clean_param($value, PARAM_TEXT));

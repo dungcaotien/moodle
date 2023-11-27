@@ -131,9 +131,9 @@ class meeting {
     /**
      * Get meeting attendees
      *
-     * @return array[]
+     * @return mixed
      */
-    public function get_attendees(): array {
+    public function get_attendees() {
         return $this->get_meeting_info()->attendees ?? [];
     }
 
@@ -166,13 +166,7 @@ class meeting {
         $presentation = $this->instance->get_presentation_for_bigbluebutton_upload(); // The URL must contain nonce.
         $presentationname = $presentation['name'] ?? null;
         $presentationurl = $presentation['url'] ?? null;
-        $response = bigbluebutton_proxy::create_meeting(
-            $data,
-            $metadata,
-            $presentationname,
-            $presentationurl,
-            $this->instance->get_instance_id()
-        );
+        $response = bigbluebutton_proxy::create_meeting($data, $metadata, $presentationname, $presentationurl);
         // New recording management: Insert a recordingID that corresponds to the meeting created.
         if ($this->instance->is_recorded()) {
             $recording = new recording(0, (object) [
@@ -190,11 +184,7 @@ class meeting {
      * Send an end meeting message to BBB server
      */
     public function end_meeting() {
-        bigbluebutton_proxy::end_meeting(
-            $this->instance->get_meeting_id(),
-            $this->instance->get_moderator_password(),
-            $this->instance->get_instance_id()
-        );
+        bigbluebutton_proxy::end_meeting($this->instance->get_meeting_id(), $this->instance->get_moderator_password());
     }
 
     /**
@@ -202,20 +192,18 @@ class meeting {
      *
      * @return string
      */
-    public function get_join_url(): string {
-        return bigbluebutton_proxy::get_join_url($this->instance, $this->get_meeting_info()->createtime);
+    public function get_join_url() {
+        return bigbluebutton_proxy::get_join_url(
+            $this->instance->get_meeting_id(),
+            $this->instance->get_user_fullname(),
+            $this->instance->get_current_user_password(),
+            $this->instance->get_logout_url()->out(false),
+            $this->instance->get_current_user_role(),
+            null,
+            $this->instance->get_user_id(),
+            $this->get_meeting_info()->createtime
+        );
     }
-
-    /**
-     * Get meeting join URL for guest
-     *
-     * @param string $userfullname
-     * @return string
-     */
-    public function get_guest_join_url(string $userfullname): string {
-        return bigbluebutton_proxy::get_guest_join_url($this->instance, $this->get_meeting_info()->createtime, $userfullname);
-    }
-
 
     /**
      * Return meeting information for this meeting.
@@ -250,7 +238,7 @@ class meeting {
         $meetinginfo->statusrunning = false;
         $meetinginfo->createtime = null;
 
-        $info = self::retrieve_cached_meeting_info($this->instance, $updatecache);
+        $info = self::retrieve_cached_meeting_info($this->instance->get_meeting_id(), $updatecache);
         if (!empty($info)) {
             $meetinginfo->statusrunning = $info['running'] === 'true';
             $meetinginfo->createtime = $info['createTime'] ?? null;
@@ -286,18 +274,11 @@ class meeting {
         }
         $meetinginfo->attendees = [];
         if (!empty($info['attendees'])) {
-            // Ensure each returned attendee is cast to an array, rather than a simpleXML object.
+            // Make sure attendees is an array of object, not a simpleXML object.
             foreach ($info['attendees'] as $attendee) {
                 $meetinginfo->attendees[] = (array) $attendee;
             }
         }
-        $meetinginfo->guestaccessenabled = $instance->is_guest_allowed();
-        if ($meetinginfo->guestaccessenabled && $instance->is_moderator()) {
-            $meetinginfo->guestjoinurl = $instance->get_guest_access_url()->out();
-            $meetinginfo->guestpassword = $instance->get_guest_access_password();
-        }
-
-        $meetinginfo->features = $instance->get_enabled_features();
         return $meetinginfo;
     }
 
@@ -332,13 +313,12 @@ class meeting {
     /**
      * Gets a meeting info object cached or fetched from the live session.
      *
-     * @param instance $instance
+     * @param string $meetingid
      * @param bool $updatecache
      *
      * @return array
      */
-    protected static function retrieve_cached_meeting_info(instance $instance, $updatecache = false) {
-        $meetingid = $instance->get_meeting_id();
+    protected static function retrieve_cached_meeting_info($meetingid, $updatecache = false) {
         $cachettl = (int) config::get('waitformoderator_cache_ttl');
         $cache = cache::make_from_params(cache_store::MODE_APPLICATION, 'mod_bigbluebuttonbn', 'meetings_cache');
         $result = $cache->get($meetingid);
@@ -372,6 +352,7 @@ class meeting {
         'disableprivatechat' => 'lockSettingsDisablePrivateChat',
         'disablepublicchat' => 'lockSettingsDisablePublicChat',
         'disablenote' => 'lockSettingsDisableNote',
+        'lockonjoin' => 'lockSettingsLockOnJoin',
         'hideuserlist' => 'lockSettingsHideUserList'
     ];
     /**
@@ -408,19 +389,11 @@ class meeting {
         if ($this->instance->get_mute_on_start()) {
             $data['muteOnStart'] = 'true';
         }
-        // Here a bit of a change compared to the API default behaviour: we should not allow guest to join
-        // a meeting managed by Moodle by default.
-        if ($this->instance->is_guest_allowed()) {
-            $data['guestPolicy'] = $this->instance->is_moderator_approval_required() ? 'ASK_MODERATOR' : 'ALWAYS_ACCEPT';
-        }
         // Locks settings.
         foreach (self::LOCK_SETTINGS_MEETING_DATA as $instancevarname => $lockname) {
             $instancevar = $this->instance->get_instance_var($instancevarname);
             if (!is_null($instancevar)) {
                 $data[$lockname] = $instancevar ? 'true' : 'false';
-                if ($instancevar) {
-                    $data['lockSettingsLockOnJoin'] = 'true'; // This will be locked whenever one settings is locked.
-                }
             }
         }
         return $data;
@@ -536,12 +509,13 @@ class meeting {
     }
 
     /**
-     * Prepare join meeting action
+     * Join a meeting.
      *
-     * @param int $origin
-     * @return void
+     * @param int $origin The spec
+     * @return string The URL to redirect to
+     * @throws meeting_join_exception
      */
-    protected function prepare_meeting_join_action(int $origin) {
+    public function join(int $origin): string {
         $this->do_get_meeting_info(true);
         if ($this->is_running()) {
             if ($this->instance->has_user_limit_been_reached($this->get_participant_count())) {
@@ -557,29 +531,6 @@ class meeting {
 
         // Before executing the redirect, increment the number of participants.
         roles::participant_joined($this->instance->get_meeting_id(), $this->instance->is_moderator());
-    }
-    /**
-     * Join a meeting.
-     *
-     * @param int $origin The spec
-     * @return string The URL to redirect to
-     * @throws meeting_join_exception
-     */
-    public function join(int $origin): string {
-        $this->prepare_meeting_join_action($origin);
-        return $this->get_join_url();
-    }
-
-    /**
-     * Join a meeting as a guest.
-     *
-     * @param int $origin The spec
-     * @param string $userfullname Fullname for the guest user
-     * @return string The URL to redirect to
-     * @throws meeting_join_exception
-     */
-    public function guest_join(int $origin, string $userfullname): string {
-        $this->prepare_meeting_join_action($origin);
         return $this->get_join_url();
     }
 }

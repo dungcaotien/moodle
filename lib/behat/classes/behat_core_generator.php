@@ -287,12 +287,6 @@ class behat_core_generator extends behat_generator_base {
                 'required' => array('contextlevel', 'reference', 'contenttype', 'user', 'contentname'),
                 'switchids' => array('user' => 'userid')
             ],
-            'user private files' => [
-                'singular' => 'user private file',
-                'datagenerator' => 'user_private_files',
-                'required' => ['user', 'filepath', 'filename'],
-                'switchids' => ['user' => 'userid']
-            ],
             'badge external backpacks' => [
                 'singular' => 'badge external backpack',
                 'datagenerator' => 'badge_external_backpack',
@@ -805,9 +799,7 @@ class behat_core_generator extends behat_generator_base {
         }
 
         $data['contextid'] = $context->id;
-        /** @var core_question_generator $qgenerator */
-        $qgenerator = $this->datagenerator->get_plugin_generator('core_question');
-        $qgenerator->create_question_category($data);
+        $this->datagenerator->get_plugin_generator('core_question')->create_question_category($data);
     }
 
     /**
@@ -854,9 +846,7 @@ class behat_core_generator extends behat_generator_base {
             $missingtypespecialcase = true;
         }
 
-        /** @var core_question_generator $qgenerator */
-        $qgenerator = $this->datagenerator->get_plugin_generator('core_question');
-        $questiondata = $qgenerator
+        $questiondata = $this->datagenerator->get_plugin_generator('core_question')
             ->create_question($data['qtype'], $which, $data);
 
         if ($missingtypespecialcase) {
@@ -1005,7 +995,7 @@ class behat_core_generator extends behat_generator_base {
     /**
      * Creates an analytics model
      *
-     * @param array $data target
+     * @param target $data
      * @return void
      */
     protected function process_analytics_model($data) {
@@ -1072,34 +1062,6 @@ class behat_core_generator extends behat_generator_base {
         } else {
             throw new Exception('The specified "' . $data['contenttype'] . '" contenttype does not exist');
         }
-    }
-
-    /**
-     * Create content in the given user's private files.
-     *
-     * @param array $data
-     * @return void
-     */
-    protected function process_user_private_files(array $data) {
-        global $CFG;
-
-        $userid = $data['userid'];
-        $fs = get_file_storage();
-        $filepath = "{$CFG->dirroot}/{$data['filepath']}";
-
-        if (!file_exists($filepath)) {
-            throw new coding_exception("File '{$filepath}' does not exist");
-        }
-        $filerecord = [
-            'userid' => $userid,
-            'contextid' => context_user::instance($userid)->id,
-            'component' => 'user',
-            'filearea' => 'private',
-            'itemid' => 0,
-            'filepath'  => '/',
-            'filename'  => basename($filepath),
-        ];
-        $fs->create_file_from_pathname($filerecord, $filepath);
     }
 
     /**

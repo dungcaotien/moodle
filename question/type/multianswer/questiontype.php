@@ -146,6 +146,7 @@ class qtype_multianswer extends question_type {
             question_bank::get_qtype($wrapped->qtype)->get_question_options($wrapped);
             // For wrapped questions the maxgrade is always equal to the defaultmark,
             // there is no entry in the question_instances table for them.
+            $wrapped->maxmark = $wrapped->defaultmark;
             $wrapped->category = $question->categoryobject->id;
             $question->options->questions[$sequence[$wrapped->id]] = $wrapped;
         }
@@ -280,7 +281,7 @@ class qtype_multianswer extends question_type {
         parent::initialise_question_instance($question, $questiondata);
 
         $bits = preg_split('/\{#(\d+)\}/', $question->questiontext,
-                -1, PREG_SPLIT_DELIM_CAPTURE);
+                null, PREG_SPLIT_DELIM_CAPTURE);
         $question->textfragments[0] = array_shift($bits);
         $i = 1;
         while (!empty($bits)) {
@@ -302,7 +303,7 @@ class qtype_multianswer extends question_type {
                 }
             }
             $question->subquestions[$key] = question_bank::make_question($subqdata);
-            $question->subquestions[$key]->defaultmark = $subqdata->defaultmark;
+            $question->subquestions[$key]->maxmark = $subqdata->defaultmark;
             if (isset($subqdata->options->layout)) {
                 $question->subquestions[$key]->layout = $subqdata->options->layout;
             }
@@ -507,7 +508,7 @@ function qtype_multianswer_extract_question($text) {
             $wrapped->shuffleanswers = 1;
             $wrapped->layout = qtype_multichoice_base::LAYOUT_HORIZONTAL;
         } else {
-            throw new \moodle_exception('unknownquestiontype', 'question', '', $answerregs[2]);
+            print_error('unknownquestiontype', 'question', '', $answerregs[2]);
             return false;
         }
 

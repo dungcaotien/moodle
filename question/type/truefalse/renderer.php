@@ -37,7 +37,6 @@ class qtype_truefalse_renderer extends qtype_renderer {
     public function formulation_and_controls(question_attempt $qa,
             question_display_options $options) {
 
-        /** @var qtype_truefalse_question $question */
         $question = $qa->get_question();
         $response = $qa->get_last_qt_var('answer', '');
 
@@ -101,15 +100,9 @@ class qtype_truefalse_renderer extends qtype_renderer {
                 array('class' => 'qtext'));
 
         $result .= html_writer::start_tag('fieldset', array('class' => 'ablock'));
-        if (!empty($question->showstandardinstruction)) {
-            $legendclass = '';
-            $questionnumber = $options->add_question_identifier_to_label(get_string('selectone', 'qtype_truefalse'), true, true);
-        } else {
-            $legendclass = 'sr-only';
-            $questionnumber = $options->add_question_identifier_to_label(get_string('answer'), true, true);
-        }
+        $questionnumber = $options->add_question_identifier_to_label(get_string('selectone', 'qtype_truefalse'), true, true);
         $result .= html_writer::tag('legend', $questionnumber,
-            array('class' => 'prompt h6 font-weight-normal ' . $legendclass));
+            array('class' => 'prompt h6 font-weight-normal'));
 
         $result .= html_writer::start_tag('div', array('class' => 'answer'));
         $result .= html_writer::tag('div', $radiotrue . ' ' . $truefeedbackimg,

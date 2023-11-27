@@ -30,8 +30,8 @@
 
 namespace core_cache\local;
 
+defined('MOODLE_INTERNAL') || die();
 use cache_store, cache_factory, cache_config_writer, cache_helper;
-use core\output\notification;
 
 /**
  * A cache helper for administration tasks
@@ -446,7 +446,7 @@ class administration_display_helper extends \core_cache\administration_helper {
 
         $plugin = required_param('plugin', PARAM_PLUGIN);
         if (!$storepluginsummaries[$plugin]['canaddinstance']) {
-            throw new \moodle_exception('ex_unmetstorerequirements', 'cache');
+            print_error('ex_unmetstorerequirements', 'cache');
         }
         $mform = $this->get_add_store_form($plugin);
         $title = get_string('addstore', 'cache', $storepluginsummaries[$plugin]['name']);
@@ -505,8 +505,9 @@ class administration_display_helper extends \core_cache\administration_helper {
      * Performs the deletestore action.
      *
      * @param string $action the action calling to this function.
+     * @return void
      */
-    public function action_deletestore(string $action): void {
+    public function action_deletestore(string $action) {
         global $OUTPUT, $PAGE, $SITE;
         $notifysuccess = true;
         $storeinstancesummaries = $this->get_store_instance_summaries();
@@ -516,10 +517,10 @@ class administration_display_helper extends \core_cache\administration_helper {
 
         if (!array_key_exists($store, $storeinstancesummaries)) {
             $notifysuccess = false;
-            $notification = get_string('invalidstore', 'cache');
+            $notifications[] = array(get_string('invalidstore', 'cache'), false);
         } else if ($storeinstancesummaries[$store]['mappings'] > 0) {
             $notifysuccess = false;
-            $notification = get_string('deletestorehasmappings', 'cache');
+            $notifications[] = array(get_string('deletestorehasmappings', 'cache'), false);
         }
 
         if ($notifysuccess) {
@@ -543,8 +544,6 @@ class administration_display_helper extends \core_cache\administration_helper {
                 $writer->delete_store_instance($store);
                 redirect($PAGE->url, get_string('deletestoresuccess', 'cache'), 5);
             }
-        } else {
-            redirect($PAGE->url, $notification, null, notification::NOTIFY_ERROR);
         }
     }
 
@@ -732,8 +731,9 @@ class administration_display_helper extends \core_cache\administration_helper {
      * Performs the delete lock action.
      *
      * @param string $action the action calling this function.
+     * @return void
      */
-    public function action_deletelock(string $action): void {
+    public function action_deletelock(string $action) {
         global $OUTPUT, $PAGE, $SITE;
         $notifysuccess = true;
         $locks = $this->get_lock_summaries();
@@ -742,10 +742,10 @@ class administration_display_helper extends \core_cache\administration_helper {
         $confirm = optional_param('confirm', false, PARAM_BOOL);
         if (!array_key_exists($lock, $locks)) {
             $notifysuccess = false;
-            $notification = get_string('invalidlock', 'cache');
+            $notifications[] = array(get_string('invalidlock', 'cache'), false);
         } else if ($locks[$lock]['uses'] > 0) {
             $notifysuccess = false;
-            $notification = get_string('deletelockhasuses', 'cache');
+            $notifications[] = array(get_string('deletelockhasuses', 'cache'), false);
         }
         if ($notifysuccess) {
             if (!$confirm) {
@@ -768,8 +768,6 @@ class administration_display_helper extends \core_cache\administration_helper {
                 $writer->delete_lock_instance($lock);
                 redirect($PAGE->url, get_string('deletelocksuccess', 'cache'), 5);
             }
-        } else {
-            redirect($PAGE->url, $notification, null, notification::NOTIFY_ERROR);
         }
     }
 

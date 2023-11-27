@@ -103,12 +103,6 @@ final class column {
     /** @var bool $available Used to know if column is available to the current user or not */
     protected $available = true;
 
-    /** @var bool $deprecated */
-    protected $deprecated = false;
-
-    /** @var string $deprecatedmessage */
-    protected $deprecatedmessage;
-
     /** @var column_model $persistent */
     protected $persistent;
 
@@ -479,20 +473,19 @@ final class column {
     }
 
     /**
-     * Adds column callback (in the case there are multiple, they will be called iteratively - the result of each passed
-     * along to the next in the chain)
+     * Adds column callback (in the case there are multiple, they will be applied one after another)
      *
      * The callback should implement the following signature (where $value is the first column field, $row is all column
-     * fields, $additionalarguments are those passed to this method, and $aggregation indicates the current aggregation type
-     * being applied to the column):
+     * fields, and $additionalarguments are those passed on from this method):
      *
-     * function($value, stdClass $row, $additionalarguments, ?string $aggregation): string
+     * The type of the $value parameter passed to the callback is determined by calling {@see set_type}, however note that
+     * if the column is part of a report source and can be aggregated using one of the "Group concatenation" methods then the
+     * type should be omitted if it's not string
+     * For entities that can to be left joined to a report, the first argument to their column callbacks must be nullable.
      *
-     * The type of the $value parameter passed to the callback is determined by calling {@see set_type}, this type is preserved
-     * if the column is part of a report source and is being aggregated. For entities that can be left joined to a report, the
-     * first argument of the callback must be nullable (as it should also be if the first column field is itself nullable).
+     * function($value, stdClass $row[, $additionalarguments]): string
      *
-     * @param callable $callable
+     * @param callable $callable function that takes arguments ($value, \stdClass $row, $additionalarguments)
      * @param mixed $additionalarguments
      * @return self
      */
@@ -653,17 +646,16 @@ final class column {
      * Return the default column value, that being the value of it's first field
      *
      * @param array $values
-     * @param int $columntype
      * @return mixed
      */
-    public static function get_default_value(array $values, int $columntype) {
+    private function get_default_value(array $values) {
         $value = reset($values);
         if ($value === null) {
             return $value;
         }
 
         // Ensure default value is cast to it's strict type.
-        switch ($columntype) {
+        switch ($this->get_type()) {
             case self::TYPE_INTEGER:
             case self::TYPE_TIMESTAMP:
                 $value = (int) $value;
@@ -687,15 +679,15 @@ final class column {
      */
     public function format_value(array $row) {
         $values = $this->get_values($row);
-        $value = self::get_default_value($values, $this->type);
+        $value = $this->get_default_value($values);
 
         // If column is being aggregated then defer formatting to them, otherwise loop through all column callbacks.
         if (!empty($this->aggregation)) {
-            $value = $this->aggregation::format_value($value, $values, $this->callbacks, $this->type);
+            $value = $this->aggregation::format_value($value, $values, $this->callbacks);
         } else {
             foreach ($this->callbacks as $callback) {
                 [$callable, $arguments] = $callback;
-                $value = ($callable)($value, (object) $values, $arguments, null);
+                $value = ($callable)($value, (object) $values, $arguments);
             }
         }
 
@@ -741,37 +733,6 @@ final class column {
     public function set_is_available(bool $available): self {
         $this->available = $available;
         return $this;
-    }
-
-    /**
-     * Set deprecated state of the column, in which case it will still be shown when already present in existing reports but
-     * won't be available for selection in the report editor
-     *
-     * @param string $deprecatedmessage
-     * @return self
-     */
-    public function set_is_deprecated(string $deprecatedmessage = ''): self {
-        $this->deprecated = true;
-        $this->deprecatedmessage = $deprecatedmessage;
-        return $this;
-    }
-
-    /**
-     * Return deprecated state of the column
-     *
-     * @return bool
-     */
-    public function get_is_deprecated(): bool {
-        return $this->deprecated;
-    }
-
-    /**
-     * Return deprecated message of the column
-     *
-     * @return string
-     */
-    public function get_is_deprecated_message(): string {
-        return $this->deprecatedmessage;
     }
 
     /**

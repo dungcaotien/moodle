@@ -175,10 +175,9 @@ class index implements renderable {
     protected function get_room_attendee_list(meeting $meeting, string $role): string {
         $attendees = [];
 
-        // Iterate attendees, matching by their "role" property.
         foreach ($meeting->get_attendees() as $attendee) {
-            if (strcmp((string) $attendee['role'], $role) === 0) {
-                $attendees[] = $attendee['fullName'];
+            if ((string) $attendee->role == $role) {
+                $attendees[] = $attendee->fullName;
             }
         }
 
